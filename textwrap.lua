@@ -337,7 +337,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local cacheChunkCtr = 1
 
 	if ( cacheDir and cacheDir ~= "" ) then
-		textUID = funx.checksum(text)
+		textUID = "cache"..funx.checksum(text)
 		local res = loadTextWrapFromCache(textUID, cacheDir)
 		if (res) then
 			textwrapIsCached = true
@@ -506,9 +506,9 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			-- case (upper/normal)
 			params.case = case
 			-- space before paragraph
-			params.spaceBefore = spaceBefore
+			params.spaceBefore = spaceBefore or 0
 			-- space after paragraph
-			params.spaceAfter = spaceAfter
+			params.spaceAfter = spaceAfter or 0
 			-- First Line Indent
 			params.firstLineIndent =firstLineIndent
 			-- Left Indent
@@ -536,15 +536,15 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				-- case (upper/normal)
 			if (params.case ) then case = params.case end
 				-- space before paragraph
-			if (params.spaceBefore ) then spaceBefore = params.spaceBefore end
+			if (params.spaceBefore ) then spaceBefore = tonumber(params.spaceBefore) end
 				-- space after paragraph
-			if (params.spaceAfter ) then spaceAfter = params.spaceAfter end
+			if (params.spaceAfter ) then spaceAfter = tonumber(params.spaceAfter) end
 				-- First Line Indent
-			if (params.firstLineIndent ) then params.firstLineIndent = firstLineIndent end
+			if (params.firstLineIndent ) then params.firstLineIndent = tonumber(firstLineIndent) end
 				-- Left Indent
-			if (params.leftIndent ) then leftIndent = params.leftIndent end
+			if (params.leftIndent ) then leftIndent = tonumber(params.leftIndent) end
 				-- Right Indent
-			if (params.rightIndent ) then rightIndent = params.rightIndent end
+			if (params.rightIndent ) then rightIndent = tonumber(params.rightIndent) end
 			if (params.textAlignment ) then textAlignment = params.textAlignment end
 	--[[
 			if (lower(textAlignment) == "Right") then
@@ -597,15 +597,15 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			if (params[10] and params[10] ~= "") then case = funx.trim(params[10]) end
 
 			-- space before paragraph
-			if (params[12] and params[12] ~= "") then spaceBefore = funx.trim(params[12]) end
+			if (params[12] and params[12] ~= "") then spaceBefore = tonumber(params[13]) end
 			-- space after paragraph
-			if (params[13] and params[13] ~= "") then spaceAfter = funx.trim(params[13]) end
+			if (params[13] and params[13] ~= "") then spaceAfter = tonumber(params[13]) end
 			-- First Line Indent
-			if (params[14] and params[14] ~= "") then firstLineIndent = funx.trim(params[14]) end
+			if (params[14] and params[14] ~= "") then firstLineIndent = tonumber(params[14]) end
 			-- Left Indent
-			if (params[15] and params[15] ~= "") then leftIndent = funx.trim(params[15]) end
+			if (params[15] and params[15] ~= "") then leftIndent = tonumber(params[15]) end
 			-- Right Indent
-			if (params[16] and params[16] ~= "") then rightIndent = funx.trim(params[16]) end
+			if (params[16] and params[16] ~= "") then rightIndent = tonumber(params[16]) end
 
 			-- alignment (note, set first line indent, etc., first!
 			if (params[11] and params[11] ~= "") then
@@ -1629,10 +1629,6 @@ if (testing) then
 	print ("  ")
 
 	newDisplayLine:setTextColor(0,250,100,255)
-
-
-
-
 end
 									-- Save the current line if we started at the margin
 									-- So the next line, if it has to, can start where this one ends.
@@ -1645,7 +1641,8 @@ end
 										--yAdjustment = (size * fontInfo.ascent )- newDisplayLine.height
 										yAdjustment = ( (size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLine.height
 									end
-
+									
+									-- NOT working for right/centered styled text!
 									-- *** This is needed so right/center justified lines are correctly positioned!!!
 									if (true) then
 										local w
@@ -1655,9 +1652,11 @@ end
 											w = currentWidth - newDisplayLine.width
 										end
 
+										w = newDisplayLine.width
+
 										-- compensate for the stroke
 										local r = display.newRect(0,0,w-2,newDisplayLine.height-2)
-										r:setStrokeColor(250,0,0,100)
+										r:setStrokeColor(0,250,100,100)
 										r.strokeWidth=1
 										result:insert(r)
 										r:setReferencePoint(textDisplayReferencePoint)

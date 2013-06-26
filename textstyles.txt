@@ -1,5 +1,5 @@
 # style = font, size, leading, R,G,B, width, opacity, NORMAL|ALL_CAPS, text alignment, spaceBefore, spaceAfter, firstLineIndent, leftIndent, rightIndent
-Normal = Avenir,16,20,255,20,20,,100%
+Normal = Avenir,16,20,0,0,0,,100%,NORMAL,left,0,0,0,0,0
 Heading 1 = Avenir-Bold,16,20,20,255,20,,100%
 Quote = BradleyHandITCTT-Bold,20,28,200,255,20,,100%
 
