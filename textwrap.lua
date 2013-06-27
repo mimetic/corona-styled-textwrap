@@ -292,7 +292,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local midscreenX = screenW*(0.5)
 	local midscreenY = screenH*(0.5)
 
-	local testing = true
+	local testing = false
 	if (testing) then
 		print ("autoWrappedText: testing flag is true")
 	end
@@ -303,7 +303,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local result = display.newGroup()
 	local minWordLen = 2
 	-- Get from the funx textStyles variable.
-	local myTextStyles = textstyles
+	local myTextStyles = textstyles or {}
 
 	local parseDepth = 0
 
@@ -433,7 +433,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	-- This will cause problems with Android
 	font = font or native.systemFont
 	size = tonumber(size) or 12
-	color = color or {255, 255, 255}
+	color = color or {0,0,0,0}
 	width = funx.applyPercent(width, screenW) or display.contentWidth
 	opacity = funx.applyPercent(opacity, 1) or 1
 	targetDeviceScreenSize = targetDeviceScreenSize or screenW..","..screenH
@@ -1202,7 +1202,7 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 							--]]
 							----------------
 							local function renderChunk()
-print ("renderChunk ------------------------------")
+
 								local tempLineWidth, words
 								local tempDisplayLine, tempDisplayLineTxt, tempDisplayLineR
 
@@ -1605,6 +1605,10 @@ end
 									if (ta == "right") then
 										newDisplayLine.x = x + currentXOffset
 										currentXOffset = newDisplayLine.x - newDisplayLine.width
+
+if (testing) then
+	print ("* currentXOffset",currentXOffset)
+end										
 										--test:
 										--newDisplayLine.x = x
 										--currentXOffset = newDisplayLine.x + newDisplayLine.width

@@ -50,8 +50,8 @@ if (true) then
 	cacheDir = "textrender_cache"
 end
 
-
-w = 200
+-- To prevent caching, set the cache dir to empty
+--cacheDir = ""
 
 local params = {
 	text = mytext,
@@ -76,10 +76,53 @@ local params = {
 local bkgd = display.newRect(0,0,screenW, screenH)
 bkgd:setFillColor(255,255,255,255)
 
+
+------------
+-- Speed tests, cache vs. no cache
+
+local function drawAndDelete(params, reps)
+	local startTime = system.getTimer()
+	reps = reps or 10
+	for i = 1, reps do
+		print ("Render text #" .. i)
+		local t = textwrap.autoWrappedText(params)
+		t:setReferencePoint(display.TopLeftReferencePoint)
+		t.x = 50
+		t.y = 50
+		t:removeSelf()
+		t = nil
+	end
+	local tdiff = system.getTimer() - startTime
+	return tdiff
+end
+
+
+local reps = 20
+
+params.cacheDir = ""
+local tdiffNoCache = drawAndDelete(params,reps)
+
+params.cacheDir = cacheDir
+local tdiffCached = drawAndDelete(params, reps)
+
+
+local tmsg = "NO CACHE: ("..reps.. " times) Time elapsed = " .. math.floor(tdiffNoCache) .. " microseconds (".. tdiffNoCache/1000 .." seconds)"
+local tmsg = tmsg .. "\nCACHED: ("..reps.. " times) Time elapsed = " .. math.floor(tdiffCached) .. " microseconds (".. tdiffCached/1000 .." seconds)"
+
+local tout = textwrap.autoWrappedText(tmsg)
+tout:setReferencePoint(display.TopLeftReferencePoint)
+tout.x = 10
+tout.y = 30
+
+
+------------
+
 local t = textwrap.autoWrappedText(params)
 t:setReferencePoint(display.TopLeftReferencePoint)
 t.x = 50
-t.y = 50
+t.y = 100
+
+
 
 -- Frame the text
 local textframe = display.newRect(0,0, w, t.height)
@@ -90,7 +133,3 @@ textframe:setReferencePoint(display.TopLeftReferencePoint)
 textframe.x = t.x
 textframe.y = t.y
 
-local p = display.newImage("p.png")
-p:setReferencePoint(display.TopLeftReferencePoint)
-p.x = 650
-p.y = 200
