@@ -32,7 +32,7 @@ local t = textwrap.autoWrappedText(params)
 
 
 Understanding the parts:
-- textwrap.lua : the module that renders a piece of text. The text can have basic HTML coding (<p>, <b>, <em>, <li>, <ol>), as well as my built-in paragraph formatting.
+- textwrap.lua : the module that renders a piece of text. The text can have basic HTML coding (p, br, i, em, b, li, ol), as well as my built-in paragraph formatting. It will also read the 'class' attribute of HTML to figure out the style, then apply the style from the textstyles.txt file!
 - HTML support: entities.lua, html.lua : these are open source modules I found and modified to handle HTML
 - fontmetrics.lua, fontmetrics.txt, fontvariations.txt : this module and files let the textwrap module position type correctly on the screen. Normally, you can't position with baseline, but these modules let us do that.
 - funx.lua : a large collection of useful functions
