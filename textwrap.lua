@@ -1656,7 +1656,9 @@ end
 											w = currentWidth - newDisplayLine.width
 										end
 
-										w = newDisplayLine.width
+										if (ta == "left") then
+											w = newDisplayLine.width
+										end
 
 										-- compensate for the stroke
 										local r = display.newRect(0,0,w-2,newDisplayLine.height-2)
