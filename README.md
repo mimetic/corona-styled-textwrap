@@ -9,7 +9,7 @@ It has a major flaw right now -- it cannot render styled text that is right/cent
 
 However, for everything else, it is fantastic. I use it for my ebook app, and it is fast and flexible.
 
-
+<pre>
 local params = {
   text = mytext,
 	font = "AvenirNext-Regular",
@@ -29,7 +29,7 @@ local params = {
 	cacheDir = cacheDir,
 }
 local t = textwrap.autoWrappedText(params)
-
+</pre>
 
 Understanding the parts:
 - textwrap.lua : the module that renders a piece of text. The text can have basic HTML coding (p, br, i, em, b, li, ol), as well as my built-in paragraph formatting. It will also read the 'class' attribute of HTML to figure out the style, then apply the style from the textstyles.txt file!
