@@ -70,6 +70,7 @@ local params = {
 	textstyles = textStyles,
 	defaultStyle = "Normal",
 	cacheDir = cacheDir,
+	isHTML = true,
 }
 
 -- Page background
@@ -97,7 +98,7 @@ local function drawAndDelete(params, reps)
 end
 
 
-local reps = 20
+local reps = 10
 
 params.cacheDir = ""
 local tdiffNoCache = drawAndDelete(params,reps)
@@ -105,9 +106,11 @@ local tdiffNoCache = drawAndDelete(params,reps)
 params.cacheDir = cacheDir
 local tdiffCached = drawAndDelete(params, reps)
 
-
-local tmsg = "NO CACHE: ("..reps.. " times) Time elapsed = " .. math.floor(tdiffNoCache) .. " microseconds (".. tdiffNoCache/1000 .." seconds)"
-local tmsg = tmsg .. "\nCACHED: ("..reps.. " times) Time elapsed = " .. math.floor(tdiffCached) .. " microseconds (".. tdiffCached/1000 .." seconds)"
+local tmsg = "RENDERING TIME\n"
+local tmsg = tmsg .. "\n### blank\n"
+local tmsg = tmsg .. "NO CACHE: ("..reps.. " times) Time elapsed = " .. math.floor(tdiffNoCache) .. " microseconds (".. tdiffNoCache/1000 .." seconds) (average = " .. (math.floor(tdiffNoCache)/reps) .. " microseconds)"
+local tmsg = tmsg .. "\n### blank,4\n"
+local tmsg = tmsg .. "\nCACHED: ("..reps.. " times) Time elapsed = " .. math.floor(tdiffCached) .. " microseconds (".. tdiffCached/1000 .." seconds) (average = " .. (math.floor(tdiffCached)/reps) .. " microseconds)"
 
 local tout = textwrap.autoWrappedText(tmsg)
 tout:setReferencePoint(display.TopLeftReferencePoint)

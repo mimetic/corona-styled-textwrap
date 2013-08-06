@@ -1212,7 +1212,7 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 								textDisplayReferencePoint = display["Bottom"..textAlignment.."ReferencePoint"]
 
 								-- Preserve initial padding before first word
-								local  _, _, padding = stringFind(nextChunk, "^(%s*)")
+								local  _, _, padding = stringFind(nextChunk, "^([%s%-]*)")
 								padding = padding or ""
 								local firstWord = true
 
@@ -1426,10 +1426,9 @@ end
 													-- Text lines can vary in height depending on whether there are upper case letters, etc.
 													-- Not predictable! So, we capture the height of the first line, and that is the basis of
 													-- our y adjustment for the entire block, to position it correctly.
-													if (not yAdjustment) then
+													if (not yAdjustment or yAdjustment == 0) then
 														--yAdjustment = (size * fontInfo.ascent )- newDisplayLine.height
 														yAdjustment = ( (size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLine.height
-
 													end
 
 													if (textwrapIsCached or (wordlen <= currentWidth * widthCorrection) ) then
@@ -1641,7 +1640,7 @@ end
 
 									-- Since line heights are not predictable, we capture the yAdjustment based on
 									-- the actual height the first rendered line of text
-									if (not yAdjustment) then
+									if (not yAdjustment or yAdjustment == 0) then
 										--yAdjustment = (size * fontInfo.ascent )- newDisplayLine.height
 										yAdjustment = ( (size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLine.height
 									end
@@ -1772,11 +1771,14 @@ end
 					-- LIST ITEMS: add a bullet or number
 					if (tag == "li") then
 						-- default for list is a disk.
-						local t = stacks.list[stacks.list.ptr].bullet
+						local t = ""
 						-- If number, use the number instead
 						if (stacks.list[stacks.list.ptr].tag == "ol" ) then
 							t = stacks.list[stacks.list.ptr].line .. ". "
 							stacks.list[stacks.list.ptr].line = stacks.list[stacks.list.ptr].line + 1
+						else
+							t = stacks.list[stacks.list.ptr].bullet
+						
 						end
 						local e = renderParsedElement(1, t, "", "")
 						-- Add one to the element counter so the next thing won't be on a new line
@@ -1788,7 +1790,6 @@ end
 					--endOfLine = false
 
 					for n, element in ipairs(parsedText) do
-
 						--local styleSettings = {}
 						if (type(element) == "table") then
 							local e = renderParsedText(element, element._tag, element._attr, parseDepth, stacks)

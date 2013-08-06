@@ -1,19 +1,7 @@
 # style = font, size, leading, R,G,B, width, opacity, NORMAL|ALL_CAPS, text alignment, spaceBefore, spaceAfter, firstLineIndent, leftIndent, rightIndent
 Normal = Avenir,16,20,0,0,0,,100%,NORMAL,left,0,0,0,0,0
-Heading 1 = Avenir-Bold,16,20,20,255,20,,100%
+Heading 1 = AvenirNext-DemiBold,16,20,20,255,20,,100%
 Quote = BradleyHandITCTT-Bold,20,28,200,255,20,,100%
-
-# styles for the library
-eventListRowTime=AvenirNextCondensed-Medium,16,16,80,120,120,,100%,NORMAL,right,0,-20,0,0,0
-eventListRowTitle=AvenirNext-Medium,20,20,0,0,0,,100%,NORMAL,left,0,2,0,0,0
-eventListRowAuthor=Avenir-Light,14,14,160,160,160,,100%,NORMAL,left,0,14,0,0,0
-eventListRowDate=Avenir-Light,16,20,0,0,0,,100%,NORMAL,left,0,0,0,0,0
-eventListRowBody=Avenir-Book,14,22,100,100,100,,100%,NORMAL,left,0,0,0,0,0
-
-eventPageTitle=AvenirNext-Medium,36,40,0,0,0,,100%,NORMAL,left,0,0,0,0,0
-eventPageAuthor=Avenir-Light,18,22,0,0,0,,100%,NORMAL,left,0,0,0,0,0
-eventPageDate=Avenir-Light,16,20,0,0,0,,100%,NORMAL,left,0,10,0,0,0
-eventPageBody=Avenir-Light,16,24,0,0,0,,100%,NORMAL,left,0,0,0,0,0
 
 # styles for the settings screen
 settingsTitle=Avenir-Heavy,24,30,100,100,100,,100%,NORMAL,center,0,0,0,0,0

@@ -235,6 +235,11 @@ HoeflerText-BlackItalic = HoeflerText-BlackItalic
 HoeflerText-Italic = HoeflerText-Italic
 HoeflerText-Regular = HoeflerText-Regular
 
+
+#JournalBold
+JournalBold-Bold = JournalBold
+JournalText-Bold = JournalBold
+
 #Kailasa
 #Kailasa = Kailasa
 Kailasa-Bold = Kailasa-Bold
