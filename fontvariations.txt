@@ -239,6 +239,7 @@ HoeflerText-Regular = HoeflerText-Regular
 #JournalBold
 JournalBold-Bold = JournalBold
 JournalText-Bold = JournalBold
+JournalText-Italic = JournalItalic
 
 #Kailasa
 #Kailasa = Kailasa

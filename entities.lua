@@ -20,25 +20,26 @@ local function tail(n, k)
 end
 
 local function to_utf8(a)
-  local n, r, u = tonumber(a)
-  if n<0x80 then                        -- 1 byte
-    return char(n)
-  elseif n<0x800 then                   -- 2 byte
-    u, n = tail(n, 1)
-    return char(n+0xc0) .. u
-  elseif n<0x10000 then                 -- 3 byte
-    u, n = tail(n, 2)
-    return char(n+0xe0) .. u
-  elseif n<0x200000 then                -- 4 byte
-    u, n = tail(n, 3)
-    return char(n+0xf0) .. u
-  elseif n<0x4000000 then               -- 5 byte
-    u, n = tail(n, 4)
-    return char(n+0xf8) .. u
-  else                                  -- 6 byte
-    u, n = tail(n, 5)
-    return char(n+0xfc) .. u
-  end
+	if not a then return nil end
+	local n, r, u = tonumber(a)
+	if n<0x80 then												-- 1 byte
+		return char(n)
+	elseif n<0x800 then										-- 2 byte
+		u, n = tail(n, 1)
+		return char(n+0xc0) .. u
+	elseif n<0x10000 then									-- 3 byte
+		u, n = tail(n, 2)
+		return char(n+0xe0) .. u
+	elseif n<0x200000 then								-- 4 byte
+		u, n = tail(n, 3)
+		return char(n+0xf0) .. u
+	elseif n<0x4000000 then								-- 5 byte
+		u, n = tail(n, 4)
+		return char(n+0xf8) .. u
+	else																	-- 6 byte
+		u, n = tail(n, 5)
+		return char(n+0xfc) .. u
+	end
 end
 
 
@@ -304,7 +305,7 @@ end
 --- Given a character entity name (like `ouml`), returns a UTF-8 encoded
 -- string encoding a unicode character.
 -- NOT WORKING: REQUIRES UNICODE.
-function M.char_entity(s)
+--[[function M.char_entity(s)
 	local i = s:match('&(%a+);')
 	local n = character_entities[i]
 	if (n) then
@@ -312,6 +313,7 @@ function M.char_entity(s)
 	end
 	return s
 end
+--]]
 
 function M.convert(s)
 	s = M.dec_entity(s)
@@ -319,5 +321,26 @@ function M.convert(s)
 	return s
 end
 
+-- Find the entity, get the character, OR return NIL
+local function get_character_entity(s)
+	local c = character_entities[s]
+	print ("C",c)
+	if ( c ) then
+		return char(c)
+	end
+	return nil
+end
+
+local gsub, char = string.gsub, string.char
+local entitySwap = function(orig,n,s)
+	s = to_utf8(tonumber(character_entities[s]))
+	--print ("entitySwap: orig,n,s,ss",orig,n,s)
+	return s or n=="#" and to_utf8(s) or orig
+end
+function M.unescape(str)
+	return gsub( str, '(&(#?)([%d%a]+);)', entitySwap )
+end
+
+--&amp;#039;
 
 return M

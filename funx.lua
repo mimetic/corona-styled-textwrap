@@ -41,6 +41,11 @@ local midscreenY = screenH*(0.5)
 
 -- functions
 local floor = math.floor
+local min = math.min
+local max = math.max
+local random = math.random
+local match = string.match
+local gmatch = string.gmatch
 
 -----------------
 -- DEBUGGING Timer
@@ -84,6 +89,8 @@ function getValue(x,asNil)
 			r = x.value
 		elseif (x.Attributes and x.Attributes.value) then
 			r = x.Attributes.value
+		elseif (x._attr and x._attr.value) then
+			r = x._attr.value
 		end
 	else
 		r = x
@@ -114,7 +121,18 @@ function escape(s)
 	return s
 end
 
-
+--=========
+--- Remove a value from a table. The table is searched and the value removed from it.
+function removeFromTable(t,obj)
+	for i,o in pairs(t) do
+		if (o == obj) then
+			t[i] = nil
+			print ("removeFromTable: removed item #" .. i)
+			return true
+		end
+	end
+	return false
+end
 
 
 -----------------
@@ -142,43 +160,191 @@ function tablelength (t)
 end
 
 
--- Delete fields of the form {x} in the string s
+-- Delete fields of the form {{x}} in the string s
 function removeFields (s)
+	if (not s) then return nil end
+	local r = string.gfind(s,"%{%{.-%}%}")
+	local res = s
+	for w in r do
+		res = trim(string.gsub(res, w, ""))
+	end
+	return res
+end
+
+-- Delete fields of the form {x} in the string s
+function removeFieldsSingle (s)
 	if (not s) then return nil end
 	local r = string.gfind(s,"%b{}")
 	local res = s
 	for w in r do
-		res = funx.trim(string.gsub(res, w, ""))
+		res = trim(string.gsub(res, w, ""))
 	end
 	return res
 end
+
+--===========
+--- Escape keys in tables so the key name can be used in a gsub search/replace
+-- @param t Table with keys that might need escaping
+-- @return	res	Key:value pairs: original key => clean key
+-- e.g. { "icon-1" = "myicon.jpg" } ===> { "icon-1" = "icon%-1" }
+function getEscapedKeysForGsub(t)
+	local gsub = string.gsub
+	-- Chars to escape: ( ) . % + - * ? [ ^ $
+	local res = {}
+	for i,v in pairs(t) do
+		res[i] = gsub(i, "([%(%)%.%%%+%-%*%?%[%^%$])", "%%%1")
+	end
+	return res
+end
+
+
+--- Substitute for {{x}} with table.x from a table.
+-- There can be multiple fields in the string, s.
+-- Returns the string with the fields filled in.
+-- @param s	String with codes to replace
+-- @param t	Table of key:value pairs to use for replacement (search for key)
+-- @param escapeTheKeys	if TRUE then escape the keys of the subsitutions table (t), if a table then use that table as the escaped keys table
+-- @return s	string with replacements
+function substitutions (s, t, escapeTheKeys)
+	local gsub = string.gsub
+	local gfind = string.gfind
+
+	if (not s or not t or t=={}) then
+		--print ("funx.substitutions: No Values passed!")
+		return s
+	end
+
+	local tclean = {}
+	if (escapeTheKeys) then
+		if (type(escapeTheKeys) == "table") then
+			tclean = escapeTheKeys
+		else
+			tclean = getEscapedKeysForGsub(t)
+		end
+	end
+
+	local r = gfind(s,"%{%{(.-)%}%}")
+	for w in r do
+		local searchTerm = tclean[w] or w
+		if (t[w]) then
+			s = gsub(s, "{{"..searchTerm.."}}", t[w])
+--print ("{{"..searchTerm.."}}", t[w],s)
+		end
+	end
+	return s
+end
+
 
 
 -- Substitute for {x} with table.x from a table.
 -- There can be multiple fields in the string, s.
 -- Returns the string with the fields filled in.
-function substitutions (s, t)
+function OLD_substitutionsSLOWER (s, t)
 	if (not s or not t or t=={}) then
 		--print ("funx.substitutions: No Values passed!")
 		return s
 	end
-	local r = string.gfind(s,"%b{}")
+	--local r = string.gfind(s,"%b{}")
+	local r = string.gfind(s,"%{%{.-%}%}")
 	local res = s
 	for w in r do
-		local i,j = string.find(w, "{(.-)}")
-		local k = string.sub(w,i+1,j-1)
+		local i,j = string.find(w, "%{%{(.-)%}%}")
+		local k = string.sub(w,i+2,j-2)
 		if (t[k]) then
-			res = string.gsub(res, "{"..k.."}", t[k])
+			res = string.gsub(res, w, t[k])
 		end
-		--print (res)
+--print ("substitutions for in "..res.." for {{"..k.."}} with ",t[k], "RESULT:",res)
+
+
 	end
 	return res
 end
 
 
+
+--===========
+--- Replace all substitutions in the entire table, including
+-- nested tables.
+-- @param t Table in which to substitute
+-- @param subs table Table of substitutions
+function tableSubstitutions(t, subs, escapeTheKeys)
+	if (type(t) ~= "table") then
+		return t
+	end
+
+	if (type(subs) ~= "table" or not subs or subs == {} ) then
+		return t
+	end
+
+	if (escapeTheKeys) then
+		if (type(escapeTheKeys) == "table") then
+			tclean = escapeTheKeys
+		else
+			tclean = getEscapedKeysForGsub(subs)
+		end
+	end
+
+
+	for i,element in pairs(t) do
+		if (i ~= "screen") then
+			if (type(element) == "string") then
+				 t[i] = substitutions (element, subs, tclean)
+--print ("element:", element, t[i])
+			elseif (type(element) == "table") then
+				 tableSubstitutions( t[i], subs, tclean)
+			elseif (element == "[[null]]" or element == "[[NULL]]" ) then
+				 t[i] = nil
+			end
+		end
+	end
+end
+
+
+
+--===========
+--- Remove elements that contain unresolved {{}} codes.
+-- @param t Table in which to substitute
+function tableRemoveUnusedCodedElements(t )
+	if (type(t) ~= "table") then
+		return t
+	end
+
+	for i,element in pairs(t) do
+		if (i ~= "screen") then
+			if (type(element) == "string" and string.find(element, "%{%{.-%}%}")) then
+--print ("tableRemoveUnusedCodedElements: Remove ", t[i])
+				t[i] = ""
+			elseif (type(element) == "table") then
+				 tableRemoveUnusedCodedElements( t[i] )
+			end
+		end
+	end
+end
+
+
+
+
+
 -- hasFieldCodes(s)
 -- Return true/false if the string has field codes, i.e. {x} inside it
 function hasFieldCodes(s)
+	if (type(s) ~= "string") then
+		return false
+	end
+	s = s or ""
+	local r = string.find(s,"%{%{.-%}%}")
+	if (r) then
+		return true
+	else
+		return false
+	end
+end
+
+
+
+-- hasFieldCodes(s)
+-- Return true/false if the string has field codes, i.e. {x} inside it
+function hasFieldCodesSingle(s)
 	if (type(s) ~= "string") then
 		return false
 	end
@@ -193,17 +359,15 @@ end
 
 
 -- Get element name from string.
--- If the string is {xxx} then the field name is "xxx"
+-- If the string is {{xxx}} then the field name is "xxx"
 function getElementName (s)
-	local r = string.gfind(s,"%b{}")
+	local r = string.gfind(s,"%{%{(.-)%}%}")
 	local res = "RESULT: "..s
 	for w in r do
-		local i,j = string.find(w, "{(.-)}")
-		local k = string.sub(w,i+1,j-1)
-		print ("extracted ",k)
+		print ("extracted ",w)
 		break
 	end
-	return k
+	return w
 end
 
 
@@ -374,7 +538,6 @@ end
 -- Save/load functions
 
 function saveData(filePath, text)
-
 	--local levelseq = table.concat( levelArray, "-" )
 	local file = io.open( filePath, "w" )
 	if (file) then
@@ -417,6 +580,11 @@ end
 -- The table is stored as comma-separated name=value pairs.
 function loadTableFromFile(filePath, s)
 	local substring = string.sub
+
+	if (not filePath) then
+		print ("WARNING: loadTableFromFile: Missing file name.")
+		return false
+	end
 
 	local file = io.open( filePath, "r" )
 
@@ -667,9 +835,10 @@ function loadImageFile(filename, filepath, whichSystemDirectory)
 	if (wc == "*" and filepath) then
 		filename = replaceWildcard(filename, filepath)
 
-		-- Files in _user are system files, everything else with a wildcard is
+		-- Files inside _user are system files, everything else with a wildcard is
 		-- a downloaded book.
-		if (filepath ~= "_user") then
+		if (not gmatch(filepath, "^_user") ) then
+		--if (filepath ~= "_user") then
 			whichSystemDirectory = whichSystemDirectory or system.CachesDirectory
 		else
 			whichSystemDirectory = whichSystemDirectory or system.ResourceDirectory
@@ -716,7 +885,7 @@ function loadImageFile(filename, filepath, whichSystemDirectory)
 
 		-- Write to the log!
 		local syspath =  system.pathForFile( "", whichSystemDirectory )
-		print ("whichSystemDirectory", syspath )
+		--print ("loadImageFile: whichSystemDirectory", syspath )
 		if (syspath == "") then
 				syspath = "ResourcesDirectory"
 		end
@@ -788,10 +957,11 @@ end
 -- url: a server to check (use http://...)
 -- showActivity: Turn off the activity indicator (must be turned on before starting)
 --------------------------------------------------------
-function canConnectWithServer(url, showActivity, callback)
+function canConnectWithServer(url, showActivity, callback, testing)
 
 			local function MyNetworkReachabilityListener(event)
-				--[[
+				local testing = false
+				if (testing) then
 					print( "address", event.address )
 					print( "isReachable", event.isReachable )
 					print("isConnectionRequired", event.isConnectionRequired)
@@ -801,7 +971,7 @@ function canConnectWithServer(url, showActivity, callback)
 					print("IsReachableViaWiFi", event.isReachableViaWiFi)
 
 					print("removing event listener")
-				--]]
+				end
 				network.setStatusListener( url, nil)
 
 				-- Turn OFF native busy activity indicator
@@ -820,15 +990,24 @@ function canConnectWithServer(url, showActivity, callback)
 	if network.canDetectNetworkStatusChanges then
 			network.setStatusListener( url, MyNetworkReachabilityListener )
 	else
-			print("canConnectWithServer: network reachability not supported on this platform")
+			print("funx.canConnectWithServer: network reachability not supported on this platform")
 	end
 end
 
 
 
 -------------------------------------------------
--- GET DEVICE SCALE FACTOR FOR RETINA RESIZING
--- 1 = no need to change anything
+--- GET DEVICE SCALE FACTOR FOR RETINA RESIZING
+--1 = no need to change anything
+--2 = multiply by 2
+-- examples:
+--	local scalingRatio = scaleFactorForRetina()
+--	local scalesuffix = "@"..scalingRatio.."x"
+--
+--	local scalingRatio = 1/scaleFactorForRetina()
+--	width = width/scalingRatio
+--	height = height/scalingRatio
+
 -------------------------------------------------
 function scaleFactorForRetina()
 	local deviceWidth = ( display.contentWidth - (display.screenOriginX * 2) ) / display.contentScaleX
@@ -960,7 +1139,21 @@ function applyPercent (x,y,noRound)
 	return tonumber(v)
 end
 
+-- ===========
+--- Get a percentage of the screen height
+-- @param y
+-- @param noRound If false, value NOT rounded to nearest integer
+function percentOfScreenHeight (y,noRound)
+	return applyPercent (y, screenH, noRound)
+end
 
+-- ===========
+--- Get a percentage of the screen height
+-- @param y
+-- @param noRound If false, value NOT rounded to nearest integer
+function percentOfScreenWidth (x,noRound)
+	return applyPercent (x, screenW, noRound)
+end
 
 -------------------------------------------------
 -- Darken the screen
@@ -1788,6 +1981,9 @@ function tellUser(message, x,y)
 	local x = x or 0
 	local y = y or 0
 
+	local w = screenW - 40
+	local h = 0	-- height matches text
+
 	-- msg corner radius
 	local r = 10
 
@@ -1811,9 +2007,14 @@ function tellUser(message, x,y)
 	------------------------------------------------------------------------
 
 	-- Create empty text box, using default bold font of device (Helvetica on iPhone)
-	local textObject = display.newText( message, 0, 0, native.systemFontBold, 24 )
+	-- Screen Width version:
+	local textObject = display.newText( message, 0, 0, w/3,h, native.systemFontBold, 24 )
+
+	-- Fitted width version, does NOT wrap text!
+	--local textObject = display.newText( message, 0, 0, native.systemFontBold, 24 )
 	textObject:setTextColor( 255,255,255 )
 
+	w = textObject.width
 
 	-- A trick to get text to be centered
 	msg.x = midscreenX
@@ -2157,6 +2358,10 @@ function hideObject(obj, fxTime, opacity, onComplete)
 	end
 
 		local function transitionComplete(obj)
+			if (not obj) then
+				print ("funx.hideObject:transitionComplete: WARNING: object is gone!")
+				return false
+			end
 			local currentAlpha = math.ceil(obj.alpha * 100)/100
 			if (currentAlpha == 0) then
 				obj.isVisible = false
@@ -2304,6 +2509,11 @@ end
 -- The new values are w,h. They could be percentages, and if only one is present, the other is the same.
 -- If the Proportional flag is true, then if both width and height
 -- are set, resize proportionally to fit INSIDE of width/height
+-- EXAMPLE:
+--   w,h = maxWidth, maxHeight
+--   pic = loadImageFile(filename)
+--   pic.width, pic.height = funx.getFinalSizes (w,h, pic.width, pic.height, true)
+
 function getFinalSizes (w,h, originalW, originalH, p)
 	local wPercent, hPercent
 	if p == nil then p = true end
@@ -2438,7 +2648,7 @@ function buildTextDisplayObjectsFromTemplate (template, obj)
 	local objs = {}
 	for i,line in pairs(lines(funx.trim(template))) do
 		--print ("Line : "..line)
-		local params = funx.split (line, ",")
+		local params = split (line, ",")
 		local name = params[1]
 		--print (name)
 		-- Set the text and size
@@ -2496,6 +2706,10 @@ function loadTextStyles(filename, path)
 	if (filename) then
 		path = path or system.DocumentsDirectory
 		local filePath = system.pathForFile( filename, path )
+		if (not filePath) then
+			print ("WARNING: missing file ",filename)
+			return {}
+		end
 		local textStyles = loadTableFromFile(filePath, "\n")
 		-- split sub-arrays (rows) into tables
 		local t = {}
@@ -2804,6 +3018,29 @@ function positionObject(x,y,w,h,margins)
 	return xpos, ypos
 end
 
+--=====
+--- Make a margins table from a string, order is T/L/B/R, e.g. "10,20,40,20"
+function stringToMarginsTable(str, default)
+	local m
+	default = default or {0,0,0,0}
+
+	if (type(default) == "string") then
+		m = funx.split ( (str or default), ",")
+	elseif (not str or str == "") then
+		m = funx.split ( default, ",")
+	else
+		m = funx.split ( str, ",")
+	end
+
+	local margins = {
+		top=applyPercent(m[1], screenH),
+		left=applyPercent(m[2], screenW),
+		bottom=applyPercent(m[3], screenH),
+		right=applyPercent(m[4], screenW),
+	}
+	return margins
+end
+
 
 ---------------
 -- positionObjectAroundCenter
@@ -2885,6 +3122,13 @@ function positionObjectWithReferencePoint(x,y,w,h,margins, absoluteflag, refPoin
 	local xref = "Left"
 	local yref = "Top"
 
+	if (type(x) == "string") then
+		x = string.lower(x)
+	end
+	if (type(y) == "string") then
+		y = string.lower(y)
+	end
+
 	-- Horizontal offsets
 	if (x == "left") then
 		xpos = w/-2 + margins.left
@@ -2928,7 +3172,7 @@ function positionObjectWithReferencePoint(x,y,w,h,margins, absoluteflag, refPoin
 end
 
 --------------
--- Check that a key in table 1 exists in table 2.
+--- Check that a key in table 1 exists in table 2.
 -- Useful for making sure the a setting value in the user settings is correctly named.
 -- example: keysExistInTable(usersettings,settings)
 function keysExistInTable(t1,t2)
@@ -2945,6 +3189,19 @@ function keysExistInTable(t1,t2)
 end
 
 
+--- Check if a value is in a table
+-- Same as in_array(myarray, value)
+function inTable(needle, haystack) -- find element v of haystack satisfying f(v)
+	if (haystack and type(haystack) == "table") then
+		for _, v in ipairs(haystack) do
+			if ( v == needle ) then
+				return v
+			end
+		end
+	end
+	return nil
+end
+
 --------------
 -- A Handy way to store an RGB or RGBA color is as a string, e.g. "250,250,10,50%"
 -- The 4th value is an alpha, 0-255
@@ -2959,6 +3216,7 @@ function stringToColorTable(s)
 			-- force numeric
 			for i,j in pairs(s) do
 				s[i] = tonumber(j)
+				s[i] = funx.applyPercent(j,255) or 255
 			end
 		end
 	end
@@ -3488,7 +3746,6 @@ function mkdirTree (dirname, systemdir)
 
 	dirname = cleanPath(dirname)
 	local dirs = split(dirname,"/")
-
 	local nextDir
 	local currDir = ""
 	for i=1,#dirs do
@@ -3632,8 +3889,8 @@ function makeMask(width, height, maskDirectory)
 		local g = display.newGroup()
 
 		local scalingRatio = scaleFactorForRetina()
-		width = width/scalingRatio
-		height = height/scalingRatio
+		width = width * scalingRatio
+		height = height * scalingRatio
 
 		local mask = display.newRect(g, 0,0,width+4, height+4 )
 		mask:setFillColor(0)
@@ -3649,6 +3906,93 @@ function makeMask(width, height, maskDirectory)
 	end
 	return maskfilename
 end
+
+
+
+-- This makes a mask for a rectangle on the screen at a particular x,y
+function makeMaskForRect(x,y,width, height, maskDirectory)
+
+	-- Display.save uses the screen size, so a retina will save a double-size image than what we need
+
+	x = math.max(x,0)
+	y = math.max(y,0)
+
+	maskDirectory = maskDirectory or "_masks"
+
+	local baseDir = system.CachesDirectory
+	local maskfilename = maskDirectory .. "/" .. "mask-" .. width .. "x" .. height .. "@" .. x .. "," .. y .. "-" ..screenW.."x"..screenH..".png"
+	if (not fileExists(maskfilename, baseDir) ) then
+
+		mkdirTree (maskDirectory, baseDir)
+
+		local g = display.newGroup()
+
+		local scalingRatio = scaleFactorForRetina()
+		width = width * scalingRatio
+		height = height * scalingRatio
+
+		-- black background
+		local mask = display.newRect(g, 0,0,screenW, screenH )
+		mask:setFillColor(0)
+
+		-- opening
+		local opening = display.newRect(g, 0,0,width, height )
+		opening:setFillColor(255)
+		opening:setReferencePoint(display.TopLeftReferencePoint)
+		opening.x = x
+		opening.y = y
+
+		display.save( g, maskfilename, baseDir )
+		g:removeSelf()
+	end
+	return maskfilename
+end
+
+-- This requires a generic mask file!!!!
+--- Masking using a single mask file, from the Corona SDK forum
+-- @params (table) object = object to mask, width/height = of mask,
+--[[
+local OPTIONS_LIST_HEIGHT = 300
+local OPTIONS_LIST_HEIGHT = 200
+local thingToMask = somedisplayobject
+
+funx.applyMask({
+	object = thingToMask,
+	width = OPTIONS_LIST_WIDTH,
+	height = OPTIONS_LIST_HEIGHT
+})
+--]]
+function applyMask(params)
+
+	local GENERIC_MASK_FILE = "_ui/generic-mask-1024x768.png"
+	local generic_mask_width = 1024
+	local generic_mask_height = 768
+
+	if params.object == nil then
+		return
+	end
+	if params.width == nil then
+		params.width = params.object.width
+	end
+	if params.height == nil then
+		params.height = params.object.height
+	end
+	if params.mask == nil then
+		params.mask = "_ui/generic-mask-1024x768.png"
+	end
+
+	local myMask = graphics.newMask(params.mask)
+	params.object:setMask(myMask)
+	params.object.maskScaleX = params.width/generic_mask_width
+	params.object.maskScaleY = params.height/generic_mask_height
+	--there may be a need in the future add logic to the positioning for different reference points
+	params.object.maskX = params.width/2
+	params.object.maskY = params.height/2
+
+end
+
+
+
 
 -- DOES NOT WORK
 function translateHTMLEntity(s)
@@ -3689,9 +4033,6 @@ end
 
 
 function checksum(str)
-	if (not str) then
-		return 0
-	end
    local temp = 0
    local weight = 10
    for i = 1, string.len(str) do
@@ -3736,3 +4077,58 @@ function deleteDirectoryContents(dir, whichSystemDirectory)
 end
 
 
+--===================================
+--- Frame a group by adding rectangle to a group, behind it.
+function frameGroup(g, s, color)
+	local r = display.newRect(g, 0, 0, g.contentWidth, g.contentHeight)
+	r.strokeWidth = s or 1
+	if (type(color) == "string") then
+		color = stringToColorTable(color)
+	end
+	r:setStrokeColor(color[1], color[2], color[3], color[4])
+	r:toBack()
+	g:setReferencePoint(display.TopLeftReferencePoint)
+	r.x = 0
+	r.y = 0
+end
+
+
+--- Get a random set from a table
+--  Check the validity of each key, does it exist in the db param?
+--  The db should be  { key1 = value, key2 = value, ...}
+--	@param	src	table = { key1, key2, ... }
+--	@param	n	number of elements of src to use
+--	@param	db	key-value table to check for validity
+--  @param  indexOrdered	(Boolean) If true, index result using ordered numbers not source keys. If indexed by keys, the result will be a key/value set using keys from src. Otherwise, result will be indexed numerically, starting at 1.
+function getRandomSet(src, n, db, indexOrdered)
+	local keys = {}
+	local i = 1
+	for k,v in pairs(src) do
+		if ( (not db) or db[v]) then
+			keys[i] = {key=k,val=v}
+			i=i+1
+		end
+	end
+	local set = {}
+	n = min(n, #keys)
+	for i = 1,n do
+		local k = random(#keys)
+		if (indexOrdered) then
+			set[#set+1] = keys[k].val
+		else
+			set[ keys[k].key ] = keys[k].val
+		end
+		table.remove(keys,k)
+	end
+	return set
+end
+
+
+function getFirstElement(t)
+	local res
+	for i,j in pairs (t) do
+		res = {i,j}
+		break
+	end
+	return res[1], res[2]
+end

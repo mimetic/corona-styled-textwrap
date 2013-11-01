@@ -1,4 +1,40 @@
 -- textwrap.lua
+--
+-- Version 2.1
+--
+-- Copyright (C) 2013 David I. Gross. All Rights Reserved.
+--
+-- This software is is protected by the author's copyright, and may not be used, copied,
+-- modified, merged, published, distributed, sublicensed, and/or sold, without
+-- written permission of the author.
+--
+-- The above copyright notice and this permission notice shall be included in all copies
+-- or substantial portions of the Software.
+--
+-- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+-- INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+-- PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE
+-- FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+-- OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+-- DEALINGS IN THE SOFTWARE.
+--
+--[[
+
+	Create a block text, wrapped to fit a rectangular boundary.
+	Formats text using basic HTML.
+	@return 	textblock	A display group containing the wrapped text.
+	
+	
+	
+	Pass params in a table, e.g. options = { ... }
+	Inside of the options table:
+	@param	hyperlinkFillColor	An RGBa string, e.g. "150,200,120,50", of the color for hyperlinks.
+	
+	
+]]
+
+
+
 
 local funx = require ("funx")
 local html = require ("html")
@@ -6,6 +42,14 @@ local entities = require ("entities")
 
 local max = math.max
 local lower = string.lower
+local gmatch = string.gmatch
+local gsub = string.gsub
+local strlen = string.len
+local substring = string.sub
+local find = string.find
+local floor = math.floor
+local gfind = string.gfind
+
 
 
 -- Be sure a caches dir is set up inside the system caches
@@ -34,6 +78,8 @@ end
 -- Main var for this module
 local T = {}
 
+-- Use "." at the beginning of a line to add spaces before it.
+local usePeriodsForLineBeginnings = false
 
 -------------------------------------------------
 -- font metrics module, for knowing text heights and baselines
@@ -95,12 +141,6 @@ local inline = {
 -- Common functions redefined for speed
 --------------------------------------------------------
 
-local strlen = string.len
-local substring = string.sub
-local stringFind = string.find
-local floor = math.floor
-
-
 --------------------------------------------------------
 -- Convert pt values to pixels, for font sizing.
 -- Basically, I think we should just use the pt sizing as
@@ -112,8 +152,8 @@ local floor = math.floor
 --------------------------------------------------------
 local function convertValuesToPixels (t, deviceMetrics)
 	t = funx.trim(t)
-	local _, _, n = string.find(t, "^(%d+)")
-	local _, _, u = string.find(t, "(%a%a)$")
+	local _, _, n = find(t, "^(%d+)")
+	local _, _, u = find(t, "(%a%a)$")
 
 	if (u == "pt" and deviceMetrics) then
 		n = n * (deviceMetrics.ppi/72)
@@ -149,8 +189,8 @@ local function getTagFormatting(fontFaces, tag, currentfont, attr)
 		return {}
 	end
 
-	local basefont = string.gsub(currentfont, "%-.*$","")
-	local _,_,variation = stringFind(currentfont, "%-(.-)$")
+	local basefont = gsub(currentfont, "%-.*$","")
+	local _,_,variation = find(currentfont, "%-(.-)$")
 	variation = variation or ""
 
 	local format = {}
@@ -215,7 +255,7 @@ end
 -- @param tag, attr
 -- @return tag, attr
 local function convertHeaders(tag, attr)
-	if ( tag and string.find(tag, "[hH]%d") ) then
+	if ( tag and find(tag, "[hH]%d") ) then
 		attr.class = lower(tag)
 		tag = "p"
 	end
@@ -229,7 +269,8 @@ end
 --------------------------------------------------------
 local function saveTextWrapToCache(id, cache, cacheDir)
 	if (cacheDir and cacheDir ~= "") then
-		funx.mkdir (cacheDir .. "/" .. textWrapCacheDir, "",false, system.CachesDirectory)
+		funx.mkdirTree (cacheDir .. "/" .. textWrapCacheDir, system.CachesDirectory)
+		--funx.mkdir (cacheDir .. "/" .. textWrapCacheDir, "",false, system.CachesDirectory)
 		-- Developing: delete the cache
 		if (true) then
 			local fn =  cacheDir .. "/" .. textWrapCacheDir .. "/" ..  id .. ".json"
@@ -268,6 +309,57 @@ end
 
 
 --------------------------------------------------------
+-- Make a box that is the right size for touching.
+-- Problem is, the font sizes are so big, they overlap lines.
+-- This box will be a nicer size.
+-- NOte, there is no stroke, so we don't x+1/y+1
+local function touchableBox(g, referencePoint, x,y, width, height, fillColor)
+
+	local touchme = display.newRect(0,0,width, height)
+	funx.setFillColorFromString(touchme, fillColor)
+	
+	g:insert(touchme)
+	touchme:setReferencePoint(referencePoint)
+	touchme.x = x
+	touchme.y = y
+	touchme:toBack()
+	
+	return touchme
+end
+
+--------------------------------------------------------
+-- Add a tap handler to the object and pass it the tag attributes, e.g. href
+-- @param obj A display object, probably text
+-- @param id String: ID of the object?
+-- @param attr table: the attributes of the tag, e.g. href or target, HTML stuff, !!! also the text tapped should be in "text" in attr
+-- @param handler table A function to handle link values, like "goToPage". These should work with the button handler in slideView
+local function attachLinkToObj(obj, attr, handler)
+
+	local function comboListener( event )
+		local object = event.target
+		if not ( event.phase ) then
+			local attr = event.target._attr
+			--print( "Tap event on word!", attr.text)
+
+
+			if (handler) then
+				handler(event)
+				--print( "Tap event on word!", attr.text)
+				--print ("Tapped on ", attr.text)
+			else
+				print ("WARNING: textwrap:attachLinkToObj says no handler set for this event.")
+			end
+		end
+		return true
+	end
+
+	obj.id = attr.id or (attr.id or "")
+	obj._attr = attr
+	obj:addEventListener( "tap", comboListener )
+	obj:addEventListener( "touch", comboListener )
+end
+
+--------------------------------------------------------
 -- Wrap text to a width
 -- Blank lines are ignored.
 -- *** To show a blank line, put a space on it.
@@ -294,7 +386,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 
 	local testing = false
 	if (testing) then
-		print ("autoWrappedText: testing flag is true")
+		print ("autoWrappedText: testing flag is true in line 335")
 	end
 
 	local deviceMetrics = funx.getDeviceMetrics( )
@@ -308,6 +400,9 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local parseDepth = 0
 
 	local isHTML = false
+
+	-- handler for links
+	local handler = {}
 
 	if (type(text) == "table") then
 		font = text.font
@@ -326,6 +421,9 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 		isHTML = text.isHTML or false
 		defaultStyle = text.defaultStyle or ""
 		cacheDir = text.cacheDir
+		handler = text.handler
+		hyperlinkFillColor = text.hyperlinkFillColor or "0,0,255,0"
+		
 		-- restore text
 		text = text.text
 	end
@@ -399,6 +497,11 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local paragraphSeparatorCode = "%E2%80%A9"	-- This is ;&#8233;
 	text = text:gsub(funx.unescape(lineSeparatorCode),"")
 	text = text:gsub(funx.unescape(paragraphSeparatorCode),"")
+	
+	-- Convert entities in the text, .e.g. "&#8211;"
+	text = entities.unescape(text)
+	
+	
 
 	--[[
 	-- NOT IN USE: THIS IS BEFORE WE PARSED INDESIGN INTO HTML
@@ -434,7 +537,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	font = font or native.systemFont
 	size = tonumber(size) or 12
 	color = color or {0,0,0,0}
-	width = funx.applyPercent(width, screenW) or display.contentWidth
+	width = funx.percentOfScreenWidth(width) or display.contentWidth
 	opacity = funx.applyPercent(opacity, 1) or 1
 	targetDeviceScreenSize = targetDeviceScreenSize or screenW..","..screenH
 	-- case can be ALL_CAPS or NORMAL
@@ -587,7 +690,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				if (params[8] == "reset" or params[8] == "r") then
 					width = defaultSettings.width
 				else
-					width = tonumber(funx.applyPercent(params[8], screenW) or defaultSettings.width)
+					width = tonumber(funx.percentOfScreenWidth(params[8]) or defaultSettings.width)
 				end
 				minLineCharCount = minCharCount or 5
 			end
@@ -668,7 +771,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			-- color
 			-- We're using decimal, e.g. 12,24,55 not hex (#ffeeff)
 			if (format.color) then
-				local _, _, c = string.find(format.color, "%((.*)%)")
+				local _, _, c = find(format.color, "%((.*)%)")
 				local s = funx.stringToColorTable(c)
 				if (s) then
 					color = { s[1], s[2], s[3], s[4] }
@@ -681,7 +784,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				if (format.width == "reset" or format.width == "r") then
 					width = defaultSettings.width
 				else
-					width = tonumber(funx.applyPercent(format.width, screenW) or defaultSettings.width)
+					width = tonumber(funx.percentOfScreenWidth(format.width) or defaultSettings.width)
 				end
 				minLineCharCount = minCharCount or 5
 			end
@@ -776,7 +879,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	-- This is ;&#8233;
 	--local paragraphSeparatorCode = "%E2%80%A9"
 	-- Get lines with ending command, e.g. CR or LF
-	--	for line in string.gmatch(text, "[^\n]+") do
+	--	for line in gmatch(text, "[^\n]+") do
 	local linebreak = funx.unescape(lineSeparatorCode)
 	local paragraphbreak = funx.unescape(paragraphSeparatorCode)
 	local oneLinePattern = "[^\n^\r]+"
@@ -792,7 +895,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	end
 
 	-- Be sure the text block ends with a return, so the line chopper below finds the last line!
-	if (string.sub(text,1,-1) ~= "\n") then
+	if (substring(text,1,-1) ~= "\n") then
 		text = text .. "\n"
 	end
 
@@ -814,11 +917,11 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	-- Usually, this will be a paragraph
 	-- Text from InDesign should be one large block,
 	-- which is right since it is escaped HTML.
-	for line in string.gmatch(text, oneLinePattern) do
+	for line in gmatch(text, oneLinePattern) do
 		local command, commandline
 		local currentFirstLineIndent, currentSpaceAfter, currentSpaceBefore
 
-		local lineEnd = string.sub(line,-1,-1)
+		local lineEnd = substring(line,-1,-1)
 		local q = funx.escape(lineEnd)
 
 		-- CR means end of paragraph, LF = soft-return
@@ -1116,8 +1219,7 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 --print ("  ")
 --print ("  ")
 --print ("  ")
---print ("elementNum, element, tag, attr")
---print (tag)
+--print ("renderParsedElement: elementNum, element, tag, attr", elementNum, element, tag)
 --funx.dump(attr)
 --print (element)
 
@@ -1212,7 +1314,7 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 								textDisplayReferencePoint = display["Bottom"..textAlignment.."ReferencePoint"]
 
 								-- Preserve initial padding before first word
-								local  _, _, padding = stringFind(nextChunk, "^([%s%-]*)")
+								local  _, _, padding = find(nextChunk, "^([%s%-]*)")
 								padding = padding or ""
 								local firstWord = true
 
@@ -1224,11 +1326,11 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 								local cachedChunkLine = 1
 								if (textwrapIsCached) then
 									cachedChunk = cache[cacheChunkCtr]
-									--words = string.gmatch(cachedChunk.text, "[^\r\n]+")
+									--words = gmatch(cachedChunk.text, "[^\r\n]+")
 									words = iteratorOverCacheText(cachedChunk.text)
 								else
 									cachedChunk = { text = {}, width = {} }
-									words = string.gmatch(nextChunk, "([^%s%-]+)([%s%-]*)")
+									words = gmatch(nextChunk, "([^%s%-]+)([%s%-]*)")
 								end
 
 								local tempLine, allTextInLine
@@ -1252,7 +1354,7 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 									if (textwrapIsCached or (strlen(allTextInLine) > minLineCharCount)) then
 
 										-- Allow for lines with beginning spaces, for positioning
-										if (substring(currentLine,1,1) == ".") then
+										if (usePeriodsForLineBeginnings and substring(currentLine,1,1) == ".") then
 											currentLine = substring(currentLine,2,-1)
 										end
 
@@ -1330,9 +1432,10 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 													end
 													cachedChunkLine = cachedChunkLine + 1
 
-													local newDisplayLine = display.newText(currentLine, 0, 0, font, size)
-													newDisplayLine:setTextColor(color[1], color[2], color[3])
-													newDisplayLine.alpha = opacity
+													local newDisplayLine = display.newGroup()								
+													local newDisplayLineText = display.newText(newDisplayLine, currentLine, 0, 0, font, size)
+													newDisplayLineText:setTextColor(color[1], color[2], color[3])
+													newDisplayLineText.alpha = opacity
 													result:insert(newDisplayLine)
 													newDisplayLine:setReferencePoint(textDisplayReferencePoint)
 													if (lower(textAlignment) == "Center") then
@@ -1415,6 +1518,14 @@ end
 															r:setStrokeColor(0,250,50,100)
 														end
 
+														if (lower(tag) == "a") then
+--print ("Yeah, tag = a")
+															local touchme = touchableBox(result, textDisplayReferencePoint, newDisplayLine.x, newDisplayLine.y - (fontInfo.capheight * size)/4,  w-2, fontInfo.capheight * size, hyperlinkFillColor)
+
+															attr.text = currentLine
+															attachLinkToObj(newDisplayLine, attr, handler)
+														end
+
 
 													end
 
@@ -1470,9 +1581,10 @@ if (testing) then
 	print ("leftIndent + currentFirstLineIndent + xOffset", leftIndent, currentFirstLineIndent, xOffset)
 end
 
-														local newDisplayLine = display.newText(word, x, lineY, font, size)
-														newDisplayLine:setTextColor(color[1], color[2], color[3])
-														newDisplayLine.alpha = opacity
+														local newDisplayLine = display.newGroup()
+														local newDisplayLineText = display.newText(newDisplayLine, word, x, lineY, font, size)
+														newDisplayLineText:setTextColor(color[1], color[2], color[3])
+														newDisplayLineText.alpha = opacity
 														result:insert(newDisplayLine)
 														newDisplayLine:setReferencePoint(textDisplayReferencePoint)
 
@@ -1499,6 +1611,16 @@ end
 														else
 															-- If this is the first line of a new paragraph, move to next line
 															currentLineHeight = lineHeight
+														end
+
+
+														if (lower(tag) == "a") then
+															w = newDisplayLine.width
+--print ("Yeah, tag = a")
+															local touchme = touchableBox(result, textDisplayReferencePoint, newDisplayLine.x, newDisplayLine.y - (fontInfo.capheight * size)/4,  w-2, fontInfo.capheight * size, hyperlinkFillColor)
+
+															attr.text = currentLine
+															attachLinkToObj(newDisplayLine, attr, handler)
 														end
 
 
@@ -1543,7 +1665,7 @@ end
 
 
 								-- Allow for lines with beginning spaces, for positioning
-								if (substring(currentLine,1,1) == ".") then
+								if (usePeriodsForLineBeginnings and substring(currentLine,1,1) == ".") then
 									currentLine = substring(currentLine,2,-1)
 								end
 
@@ -1592,10 +1714,13 @@ end
 
 --print ("C: render a line:", currentLine)
 
-									local newDisplayLine = display.newText(currentLine, x, lineY, font, size)
+									local newDisplayLine = display.newGroup()
+									local newDisplayLineText = display.newText(newDisplayLine, currentLine, x, lineY, font, size)
+									newDisplayLine.x, newDisplayLine.y = x, lineY
 									newDisplayLine.alpha = opacity
 									result:insert(newDisplayLine)
 									newDisplayLine:setReferencePoint(textDisplayReferencePoint)
+									newDisplayLineText:setTextColor(color[1], color[2], color[3])
 
 									local ta = lower(textAlignment)
 --print ("Warning: textwrap has alignment to the left for everything in C section.")
@@ -1607,7 +1732,7 @@ end
 
 if (testing) then
 	print ("* currentXOffset",currentXOffset)
-end										
+end
 										--test:
 										--newDisplayLine.x = x
 										--currentXOffset = newDisplayLine.x + newDisplayLine.width
@@ -1623,20 +1748,18 @@ end
 										currentXOffset = newDisplayLine.x + newDisplayLine.width
 									end
 									newDisplayLine.y = lineY + baselineAdjustment
-									newDisplayLine:setTextColor(color[1], color[2], color[3])
 
 if (testing) then
-	print ("C:"..currentLine)
+	print ("C: text —"..currentLine.."—")
 	print ("   newDisplayLine.y",lineY + baselineAdjustment)
 	print ("   newDisplayLine HEIGHT:",newDisplayLine.height)
 	print ("  ")
 
-	newDisplayLine:setTextColor(0,250,100,255)
+	newDisplayLineText:setTextColor(0,250,100,255)
 end
 									-- Save the current line if we started at the margin
 									-- So the next line, if it has to, can start where this one ends.
 									prevTextInLine = prevTextInLine .. currentLine
-									currentLine = ""
 
 									-- Since line heights are not predictable, we capture the yAdjustment based on
 									-- the actual height the first rendered line of text
@@ -1644,7 +1767,7 @@ end
 										--yAdjustment = (size * fontInfo.ascent )- newDisplayLine.height
 										yAdjustment = ( (size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLine.height
 									end
-									
+
 									-- NOT working for right/centered styled text!
 									-- *** This is needed so right/center justified lines are correctly positioned!!!
 									if (true) then
@@ -1661,7 +1784,7 @@ end
 
 										-- compensate for the stroke
 										local r = display.newRect(0,0,w-2,newDisplayLine.height-2)
-										r:setStrokeColor(0,250,100,100)
+										r:setStrokeColor(0,250,250,100)
 										r.strokeWidth=1
 										result:insert(r)
 										r:setReferencePoint(textDisplayReferencePoint)
@@ -1669,7 +1792,17 @@ end
 										r.y = newDisplayLine.y+1
 										r.isVisible = testing
 										r:setFillColor(0,255,0,0) -- transparent
+
+										if (lower(tag) == "a") then
+											local touchme = touchableBox(result, textDisplayReferencePoint, newDisplayLine.x, newDisplayLine.y - (fontInfo.capheight * size)/4,  w-2, fontInfo.capheight * size, hyperlinkFillColor)
+											attr.text = currentLine
+											attachLinkToObj(touchme, attr, handler)
+										end
+
 									end
+
+									-- Clear the current line
+									currentLine = ""
 
 								end
 
@@ -1687,7 +1820,7 @@ end
 
 
 
-							local chunk = renderChunk()
+							local chunk = renderChunk( tag )
 							result:insert(chunk)
 
 
@@ -1695,6 +1828,7 @@ end
 							-- If we came in with italics set, then the tag set the font
 							-- to bold-italic, this will restore the font back to italic.
 							--setStyleSettings(styleSettings)
+
 
 							return result
 						end -- renderParsedElement()
@@ -1767,7 +1901,11 @@ end
 					elseif (tag == "br") then
 					end
 
-
+					if (tag == "a") then
+						setStyleFromTag (tag, attr)
+					end
+					
+					
 					-- LIST ITEMS: add a bullet or number
 					if (tag == "li") then
 						-- default for list is a disk.
@@ -1778,7 +1916,7 @@ end
 							stacks.list[stacks.list.ptr].line = stacks.list[stacks.list.ptr].line + 1
 						else
 							t = stacks.list[stacks.list.ptr].bullet
-						
+
 						end
 						local e = renderParsedElement(1, t, "", "")
 						-- Add one to the element counter so the next thing won't be on a new line
@@ -1887,7 +2025,6 @@ end
 			-- Render this chunk of XML
 			local oneXMLBlock = renderXML(restOLine)
 			result:insert(oneXMLBlock)
-
 
 		end -- html elements for one paragraph
 
