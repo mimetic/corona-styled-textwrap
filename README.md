@@ -27,11 +27,19 @@ local params = {
 	textstyles = textStyles,
 	defaultStyle = "Normal",
 	cacheDir = cacheDir,
+	handler = handler,  -- a function that will accept a 'tap' event
+	hyperlinkFillColor = hyperlinkFillColor, -- an RGBa color in a string, like this: "200,120,255,100"
+
 }
 local t = textwrap.autoWrappedText(params)
 </pre>
 
-Understanding the parts:
+<b>Notes on the hyperlinking:</b>
+
+<b>handler</b> : a function that will use a 'tap' event. Note that event.target._attr contains the attributes of the hyperlink, e.g. href, style, class, whatever your throw in. 
+Example: <a href="makeSound" style="font-size:24;">My Link</a>
+
+<b>Understanding the parts:</b>
 - textwrap.lua : the module that renders a piece of text. The text can have basic HTML coding (p, br, i, em, b, li, ol), as well as my built-in paragraph formatting. It will also read the 'class' attribute of HTML to figure out the style, then apply the style from the textstyles.txt file!
 - HTML support: entities.lua, html.lua : these are open source modules I found and modified to handle HTML
 - fontmetrics.lua, fontmetrics.txt, fontvariations.txt : this module and files let the textwrap module position type correctly on the screen. Normally, you can't position with baseline, but these modules let us do that.
