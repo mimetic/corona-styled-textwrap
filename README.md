@@ -36,7 +36,10 @@ local t = textwrap.autoWrappedText(params)
 
 <b>Notes on the hyperlinking:</b>
 
-<b>handler</b> : a function that will use a 'tap' event. Note that event.target._attr contains the attributes of the hyperlink, e.g. href, style, class, whatever your throw in. 
+<b>handler</b> : a function that will use a 'tap' event. Note that event.target._attr contains the attributes 
+the hyperlink, e.g. href, style, class, whatever your throw in. 
+In the example, the function will get 'makeSound' as the href, and it can do the appropriate action. 
+You can pass any attribute you need, such as a page number or URL, of course.<br>
 Example: &lt;a href="makeSound" style="font-size:24;"&gt;My Link&lt;/a&gt;
 
 <b>Understanding the parts:</b>
