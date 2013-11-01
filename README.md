@@ -37,7 +37,7 @@ local t = textwrap.autoWrappedText(params)
 <b>Notes on the hyperlinking:</b>
 
 <b>handler</b> : a function that will use a 'tap' event. Note that event.target._attr contains the attributes of the hyperlink, e.g. href, style, class, whatever your throw in. 
-Example: <a href="makeSound" style="font-size:24;">My Link</a>
+Example: &lt;a href="makeSound" style="font-size:24;"&gt;My Link&lt;/a&gt;
 
 <b>Understanding the parts:</b>
 - textwrap.lua : the module that renders a piece of text. The text can have basic HTML coding (p, br, i, em, b, li, ol), as well as my built-in paragraph formatting. It will also read the 'class' attribute of HTML to figure out the style, then apply the style from the textstyles.txt file!
