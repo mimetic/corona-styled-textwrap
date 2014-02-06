@@ -1,13 +1,2 @@
 # style = font, size, leading, R,G,B, width, opacity, NORMAL|ALL_CAPS, text alignment, spaceBefore, spaceAfter, firstLineIndent, leftIndent, rightIndent
-Normal = Avenir,16,20,0,0,0,,100%,NORMAL,left,0,0,0,0,0
-Heading 1 = AvenirNext-DemiBold,16,20,20,255,20,,100%
-Quote = BradleyHandITCTT-Bold,20,28,200,255,20,,100%
-
-# styles for the settings screen
-settingsTitle=Avenir-Heavy,24,30,100,100,100,,100%,NORMAL,center,0,0,0,0,0
-settingsBody=Avenir-Light,18,24,60,60,60,,100%,NORMAL,left,0,24,0,0,0
-settingsLabel=Avenir-Medium,18,24,60,60,60,,100%,NORMAL,left,0,24,0,0,0
-
-# styles for captions
-caption=Avenir-Book,14,24,0,0,0,,100%,NORMAL,left,0,14,0,0,0
-caption-title=Avenir-Book,14,24,0,0,0,,100%,NORMAL,left,0,14,0,0,0
+Normal = Avenir,16,20,0,0,0,,100%,NORMAL,left,20,0,0,0,0

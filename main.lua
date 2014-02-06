@@ -24,6 +24,15 @@
 	cacheDir = the name of the cache folder to use inside system.CachesDirectory, e.g. "text_render_cache"
 --]]
 
+-- Patches to allow Graphics 1.0 calls while using Graphics 2.0
+require( 'dmc_kompatible' )
+--require( 'scripts.dmc.dmc_kolor.dmc_kolor' )
+--require ( 'scripts.patches.refPointConversions' )
+
+-- Default anchor settings
+--display.setDefault( "anchorX", 0 )
+--display.setDefault( "anchorY", 0 )
+
 
 -- My useful function collection
 local funx = require("funx")
@@ -76,6 +85,9 @@ local params = {
 -- Page background
 local bkgd = display.newRect(0,0,screenW, screenH)
 bkgd:setFillColor(255,255,255,255)
+bkgd:setReferencePoint(display.TopLeftReferencePoint)
+bkgd.x = 0
+bkgd.y = 0
 
 
 ------------
@@ -97,14 +109,15 @@ local function drawAndDelete(params, reps)
 	return tdiff
 end
 
-
-local reps = 10
+--[[
+local reps = 0
 
 params.cacheDir = ""
 local tdiffNoCache = drawAndDelete(params,reps)
 
 params.cacheDir = cacheDir
 local tdiffCached = drawAndDelete(params, reps)
+
 
 local tmsg = "RENDERING TIME\n"
 local tmsg = tmsg .. "\n### blank\n"
@@ -117,12 +130,12 @@ tout:setReferencePoint(display.TopLeftReferencePoint)
 tout.x = 10
 tout.y = 30
 
-
+--]]
 ------------
 
 local t = textwrap.autoWrappedText(params)
 t:setReferencePoint(display.TopLeftReferencePoint)
-t.x = 50
+t.x = 350
 t.y = 100
 
 

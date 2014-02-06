@@ -46,6 +46,8 @@ local max = math.max
 local random = math.random
 local match = string.match
 local gmatch = string.gmatch
+local find = string.find
+local gfind = string.gfind
 
 -----------------
 -- DEBUGGING Timer
@@ -59,6 +61,20 @@ function timePassed(msg)
 	msg = msg or ""
 	print ("funx.timePassed: ", math.floor(t) .. "ms", msg) --, "Total:", math.floor(t2-firstTime))
 	io.flush( )
+end
+
+
+-----------------
+-- 'n' is the call stack level to show
+-- '2' will show the calling function
+function printFuncName(n)
+	n = n or 2
+	local info = debug.getinfo(n, "Snl")
+	if info.what == "C" then   -- is a C function?
+	  print(n, "C function")
+	else   -- a Lua function
+	  print(string.format("[%s]:%d", info.name, info.currentline))
+	end
 end
 
 
@@ -163,7 +179,7 @@ end
 -- Delete fields of the form {{x}} in the string s
 function removeFields (s)
 	if (not s) then return nil end
-	local r = string.gfind(s,"%{%{.-%}%}")
+	local r = gfind(s,"%{%{.-%}%}")
 	local res = s
 	for w in r do
 		res = trim(string.gsub(res, w, ""))
@@ -174,7 +190,7 @@ end
 -- Delete fields of the form {x} in the string s
 function removeFieldsSingle (s)
 	if (not s) then return nil end
-	local r = string.gfind(s,"%b{}")
+	local r = gfind(s,"%b{}")
 	local res = s
 	for w in r do
 		res = trim(string.gsub(res, w, ""))
@@ -207,7 +223,6 @@ end
 -- @return s	string with replacements
 function substitutions (s, t, escapeTheKeys)
 	local gsub = string.gsub
-	local gfind = string.gfind
 
 	if (not s or not t or t=={}) then
 		--print ("funx.substitutions: No Values passed!")
@@ -244,8 +259,8 @@ function OLD_substitutionsSLOWER (s, t)
 		--print ("funx.substitutions: No Values passed!")
 		return s
 	end
-	--local r = string.gfind(s,"%b{}")
-	local r = string.gfind(s,"%{%{.-%}%}")
+	--local r = gfind(s,"%b{}")
+	local r = gfind(s,"%{%{.-%}%}")
 	local res = s
 	for w in r do
 		local i,j = string.find(w, "%{%{(.-)%}%}")
@@ -361,7 +376,7 @@ end
 -- Get element name from string.
 -- If the string is {{xxx}} then the field name is "xxx"
 function getElementName (s)
-	local r = string.gfind(s,"%{%{(.-)%}%}")
+	local r = gfind(s,"%{%{(.-)%}%}")
 	local res = "RESULT: "..s
 	for w in r do
 		print ("extracted ",w)
@@ -837,7 +852,7 @@ function loadImageFile(filename, filepath, whichSystemDirectory)
 
 		-- Files inside _user are system files, everything else with a wildcard is
 		-- a downloaded book.
-		if (not gmatch(filepath, "^_user") ) then
+		if (not find(filepath, "^_user") ) then
 		--if (filepath ~= "_user") then
 			whichSystemDirectory = whichSystemDirectory or system.CachesDirectory
 		else
@@ -933,14 +948,17 @@ end
 -- showActivity: Turn off the activity indicator (must be turned on before starting)
 --------------------------------------------------------
 function hasNetConnection(url,showActivity)
-	local http = require("socket.http")
-	local ltn12 = require("ltn12")
+	local socket = require("socket")
+	local test = socket.tcp()
+	test:settimeout(1, 't') -- timeout 1 sec
 
-	url = url or "http://www.google.com"
-	if (string.sub(url, 1, 4) ~= "http") then
-		url = "http://" .. url
+	url = url or "www.google.com"
+	if (string.sub(url, 1, 4) == "http") then
+		url = url:gsub("^https?://", "")
 	end
-	if http.request( url ) == nil then
+	local testResult = test:connect(url,80)
+
+	if (testResult == nil) then
 		if (showActivity) then native.setActivityIndicator( false ) end
 		return false
 	else
@@ -950,8 +968,6 @@ function hasNetConnection(url,showActivity)
 
 end
 
-
-
 --------------------------------------------------------
 -- canConnectWithServer: return true if connected, false if not.
 -- url: a server to check (use http://...)
@@ -960,8 +976,8 @@ end
 function canConnectWithServer(url, showActivity, callback, testing)
 
 			local function MyNetworkReachabilityListener(event)
-				local testing = false
 				if (testing) then
+					print( "url", url )
 					print( "address", event.address )
 					print( "isReachable", event.isReachable )
 					print("isConnectionRequired", event.isConnectionRequired)
@@ -973,6 +989,14 @@ function canConnectWithServer(url, showActivity, callback, testing)
 					print("removing event listener")
 				end
 				network.setStatusListener( url, nil)
+
+				-- Simulator bug or something...always returns failure
+				local isSimulator = "simulator" == system.getInfo("environment")
+
+				if (isSimulator) then
+					event.isReachable = true
+					print ("canConnectWithServer: Corona simulator: Forcing a TRUE for event.isReachable because this fails in simulator.")
+				end
 
 				-- Turn OFF native busy activity indicator
 				if (showActivity) then
@@ -1937,14 +1961,28 @@ end
 function fadeOut (obj, callback, transitionSpeed)
 	--print ("fadeOut: time="..fadePageTime)
 	callback = callback or nil
+	if (type(callback) ~= "function") then callback = nil end
+
+	local function myCallback()
+		obj._isTweening = false
+		if (callback) then callback() end
+	end
+
 	local t = transitionSpeed or (fadePageTime or 500)
-	transition.to( obj,  { time=t, alpha=0, onComplete=callback } )
+	transition.to( obj,  { time=t, alpha=0, onComplete=myCallback } )
+	obj._isTweening = true
 end
 
 -------------------------------------------------
 function fadeIn (obj, callback, transitionSpeed)
 	--print ("fadeIn: time="..fadePageTime)
 	callback = callback or nil
+	if (type(callback) ~= "function") then callback = nil end
+
+	local function myCallback()
+		obj._isTweening = false
+		if (callback) then callback() end
+	end
 
 	if (not obj.isVisible) then
 		obj.alpha = 0
@@ -1952,7 +1990,9 @@ function fadeIn (obj, callback, transitionSpeed)
 	end
 
 	local t = transitionSpeed or (fadePageTime or 500)
-	transition.to( obj,  { time=t, alpha=1, onComplete=callback} )
+	transition.to( obj,  { time=t, alpha=1, onComplete=myCallback} )
+	obj._isTweening = true
+
 end
 
 
@@ -2012,7 +2052,7 @@ function tellUser(message, x,y)
 
 	-- Fitted width version, does NOT wrap text!
 	--local textObject = display.newText( message, 0, 0, native.systemFontBold, 24 )
-	textObject:setTextColor( 255,255,255 )
+	textObject:setFillColor( 255,255,255 )
 
 	w = textObject.width
 
@@ -2162,11 +2202,11 @@ function activityIndicator( mode )
 end
 
 function activityIndicatorOn( mode )
-	native.setActivityIndicator( true )
+	timer.performWithDelay(1, function() native.setActivityIndicator( true ) end )
 end
 
 function activityIndicatorOff( mode )
-	native.setActivityIndicator( false )
+	timer.performWithDelay(1, function() native.setActivityIndicator( false ) end )
 end
 
 
@@ -2239,14 +2279,14 @@ function spinner()
 	local label = display.newText( "Activity indicator will disappear in:", 0, 0, system.systemFont, 16 )
 	label.x = display.contentWidth * 0.5
 	label.y = display.contentHeight * 0.3
-	label:setTextColor( 10, 10, 255 )
+	label:setFillColor( 10, 10, 255 )
 
 	local numSeconds = 5
 	local counterSize = 36
 	local counter = display.newText( tostring( numSeconds ), 0, 0, system.systemFontBold, counterSize )
 	counter.x = label.x
 	counter.y = label.y + counterSize
-	counter:setTextColor( 10, 10, 255 )
+	counter:setFillColor( 10, 10, 255 )
 
 	function counter:timer( event )
 		numSeconds = numSeconds - 1
@@ -2281,8 +2321,8 @@ function toggleObject(obj, fxTime, opacity, onComplete)
 
 	-- be sure these properties exist
 	obj.tween = obj.tween or {}
-	if (obj.isTweening == nil) then
-		obj.isTweening = false
+	if (obj._isTweening == nil) then
+		obj._isTweening = false
 	end
 
 		local function transitionComplete(obj)
@@ -2292,7 +2332,7 @@ function toggleObject(obj, fxTime, opacity, onComplete)
 			else
 				obj.isVisible = true
 			end
-			obj.isTweening = false
+			obj._isTweening = false
 			obj.tweenDirection = nil
 
 			if (onComplete) then
@@ -2301,9 +2341,9 @@ function toggleObject(obj, fxTime, opacity, onComplete)
 		end
 
 	-- Cancel transition if caught in the middle
-	if (obj.tween and obj.isTweening) then
+	if (obj.tween and obj._isTweening) then
 		transition.cancel(obj.tween)
-		obj.isTweening = false
+		obj._isTweening = false
 		obj.tween = nil
 		--print ("toggleObject: CANCELLED TRANSITION")
 	end
@@ -2328,7 +2368,7 @@ function toggleObject(obj, fxTime, opacity, onComplete)
 	end
 	--print ("obj alpha = "..obj.alpha)
 	--print ("obj.tweenDirection: "..obj.tweenDirection)
-	obj.isTweening = true
+	obj._isTweening = true
 	--print "------------- END"
 end
 
@@ -2353,8 +2393,8 @@ function hideObject(obj, fxTime, opacity, onComplete)
 
 	-- be sure these properties exist
 	obj.tween = obj.tween or {}
-	if (obj.isTweening == nil) then
-		obj.isTweening = false
+	if (obj._isTweening == nil) then
+		obj._isTweening = false
 	end
 
 		local function transitionComplete(obj)
@@ -2368,7 +2408,7 @@ function hideObject(obj, fxTime, opacity, onComplete)
 			else
 				obj.isVisible = true
 			end
-			obj.isTweening = false
+			obj._isTweening = false
 			obj.tweenDirection = nil
 
 			if (onComplete) then
@@ -2377,9 +2417,9 @@ function hideObject(obj, fxTime, opacity, onComplete)
 		end
 
 	-- Cancel transition if caught in the middle
-	if (obj.tween and obj.isTweening) then
+	if (obj.tween and obj._isTweening) then
 		transition.cancel(obj.tween)
-		obj.isTweening = false
+		obj._isTweening = false
 		obj.tween = nil
 		--print ("toggleObject: CANCELLED TRANSITION")
 	end
@@ -2392,7 +2432,7 @@ function hideObject(obj, fxTime, opacity, onComplete)
 		end
 		obj.tweenDirection = "going"
 
-	obj.isTweening = true
+	obj._isTweening = true
 
 end
 
@@ -2660,7 +2700,7 @@ function buildTextDisplayObjectsFromTemplate (template, obj)
 
 		local o = display.newText(t, 0, 0, native.systemFontBold, params[4])
 		-- color
-		o:setTextColor(0, 0, 0)
+		o:setFillColor(0, 0, 0)
 		-- Set the coordinates
 		o.x = params[2]
 		o.y = params[3]
@@ -2779,7 +2819,7 @@ function showTestBox (g,x,y,len, font,size,lineHeight,fontMetrics)
 	b:setReferencePoint(display.TopLeftReferencePoint)
 	b.x = x
 	b.y = y
-	b:setFillColor(0,0,250,50)
+	b:setFillColor(0,0,250, 0.3)
 	print ("showTestLine: lineheight:",lineHeight)
 end
 
@@ -2790,9 +2830,9 @@ function showTestLine (g,x,y,t,leading)
 	leading = leading or 0
 	len = len or 100
 	local b = display.newLine(g, x, y, x+len, y)
-	b:setColor(0,0,100,230)
+	b:setColor(0,0,100,0.9)
 	local t = display.newText(g, "y="..y..":"..", "..leading..": "..t,x,y,"Georgia-Italic",9)
-	t:setTextColor(0,0,0)
+	t:setFillColor(0,0,0)
 end
 
 
@@ -2879,7 +2919,8 @@ function adjustXYforShadow (x, y, rp, shadowOffset, scale)
 		else
 			offsetY = 0
 		end
-
+		x = x or 0
+		y = y or 0
 		x = math.floor((x + shadowOffsetX) * scale)
 		y = math.floor((y + shadowOffsetY) * scale)
 		--print ("b) adjustXYforShadow adjustedment:", x, y, scale)
@@ -3204,25 +3245,57 @@ end
 
 --------------
 -- A Handy way to store an RGB or RGBA color is as a string, e.g. "250,250,10,50%"
--- The 4th value is an alpha, 0-255
+-- The 4th value is an alpha, 0-255, or OPAQUE or TRANSPARENT
 -- This returns a table from such a string.
 -- If given a table, this does nothing (in case the value was already converted somewhere!)
-function stringToColorTable(s)
+--
+-- If any value is between 0 & 1, then we must be dealing with HDR values, not RGB values
+-- e.g. 0,0,2 must be RGB, but 0,0,0.1 must be HDR.
+-- We only have a problem when the highest value is 1, but when would anyone use an RGB value of 1? Never.
+-- Therefore, if all values <= 1 then it's and HDR value.
+--
+-- If toHDR, then force the result to be HDR. This is useful for widgets and other libraries
+-- that don't let us redefine their display.setFillColor functions.
+
+function stringToColorTable(s, toHDR, isHDR)
 	if (type(s) == "string") then
 		s = trim(s, true)
 		if (s) then
 			s = funx.split(s, ",")
-			s[4] = funx.applyPercent(s[4],255) or 255
+
+			local maxVal = 255	-- RGB max
+			local valSum = ( tonumber(s[1]) or 0) + (tonumber(s[2]) or 0) + (tonumber(s[3]) or 0)
+			if ( isHDR or  ( valSum > 0 and valSum <= 3 ) ) then
+				maxVal = 1	-- HDR max
+			end
+			
+			local opacity = string.lower(s[4] or maxVal)
+			if ( opacity == "opaque" ) then
+				s[4] = maxVal
+			elseif (opacity == "transparent") then
+				s[4] = 0
+			else
+				s[4] = funx.applyPercent(s[4], maxVal) or maxVal
+			end
 			-- force numeric
 			for i,j in pairs(s) do
 				s[i] = tonumber(j)
-				s[i] = funx.applyPercent(j,255) or 255
+				s[i] = funx.applyPercent(j,maxVal) or maxVal
+			end
+			
+			if (toHDR) then
+				s = { s[1]/255, s[2]/255, s[3]/255, s[4] }
 			end
 		end
 	end
 	return s
 end
 
+-- Here's a shortcut for getting an HDR color from RGB or HDR values
+-- Set isHDR to true if the input string uses HDR values
+function stringToColorTableHDR(s, isHDR)
+	return stringToColorTable(s, true, isHDR)
+end
 
 ----------------------------------------------------------------------
 -- Picture Corners
@@ -3807,8 +3880,8 @@ end
 -- All values can be number or percent
 function setFillColorFromString(obj, cstring)
 	local s = stringToColorTable(cstring)
-	if (obj.setTextColor) then
-		obj:setTextColor(s[1], s[2], s[3], s[4])
+	if (obj.setFillColor) then
+		obj:setFillColor(s[1], s[2], s[3], s[4])
 	else
 		obj:setFillColor(s[1], s[2], s[3], s[4])
 	end
@@ -4132,3 +4205,6 @@ function getFirstElement(t)
 	end
 	return res[1], res[2]
 end
+
+
+

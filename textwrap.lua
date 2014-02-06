@@ -23,16 +23,19 @@
 	Create a block text, wrapped to fit a rectangular boundary.
 	Formats text using basic HTML.
 	@return 	textblock	A display group containing the wrapped text.
-	
-	
-	
+
+
+
 	Pass params in a table, e.g. options = { ... }
 	Inside of the options table:
 	@param	hyperlinkFillColor	An RGBa string, e.g. "150,200,120,50", of the color for hyperlinks.
-	
-	
+
+
 ]]
 
+
+-- TESTING
+local testing = false
 
 
 
@@ -51,6 +54,9 @@ local floor = math.floor
 local gfind = string.gfind
 
 
+-- Useful constants
+local OPAQUE = 1
+local TRANSPARENT = 0
 
 -- Be sure a caches dir is set up inside the system caches
 local textWrapCacheDir = "textwrap"
@@ -317,13 +323,13 @@ local function touchableBox(g, referencePoint, x,y, width, height, fillColor)
 
 	local touchme = display.newRect(0,0,width, height)
 	funx.setFillColorFromString(touchme, fillColor)
-	
+
 	g:insert(touchme)
 	touchme:setReferencePoint(referencePoint)
 	touchme.x = x
 	touchme.y = y
 	touchme:toBack()
-	
+
 	return touchme
 end
 
@@ -384,7 +390,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local midscreenX = screenW*(0.5)
 	local midscreenY = screenH*(0.5)
 
-	local testing = false
 	if (testing) then
 		print ("autoWrappedText: testing flag is true in line 335")
 	end
@@ -393,6 +398,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 
 --if text == '' then return false end
 	local result = display.newGroup()
+
 	local minWordLen = 2
 	-- Get from the funx textStyles variable.
 	local myTextStyles = textstyles or {}
@@ -423,7 +429,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 		cacheDir = text.cacheDir
 		handler = text.handler
 		hyperlinkFillColor = text.hyperlinkFillColor or "0,0,255,0"
-		
+
 		-- restore text
 		text = text.text
 	end
@@ -497,11 +503,11 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local paragraphSeparatorCode = "%E2%80%A9"	-- This is ;&#8233;
 	text = text:gsub(funx.unescape(lineSeparatorCode),"")
 	text = text:gsub(funx.unescape(paragraphSeparatorCode),"")
-	
+
 	-- Convert entities in the text, .e.g. "&#8211;"
 	text = entities.unescape(text)
-	
-	
+
+
 
 	--[[
 	-- NOT IN USE: THIS IS BEFORE WE PARSED INDESIGN INTO HTML
@@ -534,7 +540,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local minLineCharCount = minCharCount or 5
 
 	-- This will cause problems with Android
-	font = font or native.systemFont
+	font = font or "Helvetica" --native.systemFont
 	size = tonumber(size) or 12
 	color = color or {0,0,0,0}
 	width = funx.percentOfScreenWidth(width) or display.contentWidth
@@ -912,6 +918,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	-- Corona positions type incorrectly, at the descender line, not the baseline.
 	local yAdjustment = 0
 
+	-- The output x,y for any given chunk of text
+	local cursorX, cursorY = 0,0
 
 	-- Repeat for each block of text (ending with a carriage return)
 	-- Usually, this will be a paragraph
@@ -1027,6 +1035,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			local function renderXML (xmlChunk)
 
 				local result = display.newGroup()
+				result.anchorChildren = true
 
 				-- Need a positioning rect so that indents work.
 if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
@@ -1047,6 +1056,7 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 				if (textAlignment and textAlignment ~= "") then
 					textAlignment = funx.fixCapsForReferencePoint(textAlignment)
 					textDisplayReferencePoint = display["Bottom"..textAlignment.."ReferencePoint"]
+--print ("1053:",textAlignment)
 				else
 					textAlignment = "Left"
 					textDisplayReferencePoint = display.CenterLeftReferencePoint
@@ -1176,7 +1186,7 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 				local function renderParsedText(parsedText, tag, attr, parseDepth, stacks)
 
 					local result = display.newGroup()
-
+					
 					parseDepth = parseDepth or 0
 					parseDepth = parseDepth + 1
 
@@ -1214,27 +1224,13 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 					-- NOT a <p>, but perhaps something inside <p></p>
 					------------------------------------------------------------
 					local function renderParsedElement(elementNum, element, tag, attr)
-
-
---print ("  ")
---print ("  ")
---print ("  ")
---print ("renderParsedElement: elementNum, element, tag, attr", elementNum, element, tag)
---funx.dump(attr)
---print (element)
-
-
-							local result = display.newGroup();
 							-- flag to indicate the text line to be rendered is the last line of the previously
 							-- rendered text (true) or is the continuation of that text (false)
 							-- Starts true for first item, then is false unless changed later.
 							renderTextFromMargin = (elementCounter == 1)
 
 							local nextChunk = element or ""
-
 							local nextChunkLen = strlen(nextChunk)
-
-							--local styleSettings = getAllStyleSettings()
 
 							-- Apply the tag, e.g. bold or italic
 							if (tag) then
@@ -1432,36 +1428,46 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 													end
 													cachedChunkLine = cachedChunkLine + 1
 
-													local newDisplayLine = display.newGroup()								
-													local newDisplayLineText = display.newText(newDisplayLine, currentLine, 0, 0, font, size)
-													newDisplayLineText:setTextColor(color[1], color[2], color[3])
+													local newDisplayLineGroup = display.newGroup()
+													newDisplayLineGroup.anchorChildren = true
+													
+													local newDisplayLineText = display.newText({
+														parent=newDisplayLineGroup,
+														text=currentLine,
+														x=0, y=0,
+														font=font,
+														fontSize = size,
+														align = lower(textAlignment) or "left",
+													})
+													newDisplayLineText:setFillColor(unpack(color))
 													newDisplayLineText.alpha = opacity
-													result:insert(newDisplayLine)
-													newDisplayLine:setReferencePoint(textDisplayReferencePoint)
+													
+													result:insert(newDisplayLineGroup)
+													newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
 													if (lower(textAlignment) == "Center") then
-														newDisplayLine.x = floor(currentWidth/2)  + x + leftIndent + currentFirstLineIndent + xOffset
+														newDisplayLineGroup.x = floor(currentWidth/2)  + x + leftIndent + currentFirstLineIndent + xOffset
 													elseif (lower(textAlignment) == "right") then
-														newDisplayLine.x = x - xOffset
+														newDisplayLineGroup.x = x - xOffset
 													else
-														newDisplayLine.x = x + leftIndent + currentFirstLineIndent + xOffset
+														newDisplayLineGroup.x = x + leftIndent + currentFirstLineIndent + xOffset
 													end
 
 													-- record the width of the current line
 													-- in case we need to add the next
 													-- chunk to the end of it
-													--currentXOffset = newDisplayLine.x + newDisplayLine.width
+													--currentXOffset = newDisplayLineGroup.x + newDisplayLineGroup.width
 if (testing) then
 	print ()
 	print ("----------------------------")
 	print ("A: Render line: "..currentLine)
 	print ("\nRender a line (start at margin?)", renderTextFromMargin)
 	print ("isFirstLine", isFirstLine)
-	print ("   newDisplayLine.y",lineY + baselineAdjustment, baselineAdjustment)
-	print ("   newDisplayLine HEIGHT:",newDisplayLine.height)
+	print ("   newDisplayLineGroup.y",lineY + baselineAdjustment, baselineAdjustment)
+	print ("   newDisplayLineGroup HEIGHT:",newDisplayLineGroup.height)
 	print ("leftIndent + currentFirstLineIndent + xOffset", leftIndent, currentFirstLineIndent, xOffset)
 end
 													-- Adjust Y to the baseline, not top-left corner of the font bounding-box
-													newDisplayLine.y = lineY + baselineAdjustment
+													newDisplayLineGroup.y = lineY + baselineAdjustment
 													lineCount = lineCount + 1
 
 													-- Use once, then set to zero.
@@ -1498,32 +1504,32 @@ end
 														if (renderTextFromMargin) then
 															w = currentWidth
 														else
-															w = newDisplayLine.width
+															w = newDisplayLineGroup.width
 														end
 
 														-- compensate for the stroke
-														local r = display.newRect(0,0,w-2,newDisplayLine.height-2)
-														r:setStrokeColor(0,250,250,100)
+														local r = display.newRect(0,0,w-2,newDisplayLineGroup.height-2)
+														r:setStrokeColor(0,250,250,0.5)
 														r.strokeWidth=1
 														result:insert(r)
 														r:setReferencePoint(textDisplayReferencePoint)
-														r.x = newDisplayLine.x+1
-														r.y = newDisplayLine.y+1
+														r.x = newDisplayLineGroup.x+1
+														r.y = newDisplayLineGroup.y+1
 														r.isVisible = testing
 														r:setFillColor(0,255,0,0)
 
 														if (renderTextFromMargin) then
-															r:setStrokeColor(0,250,250,100)
+															r:setStrokeColor(0,250,250,0.5)
 														else
-															r:setStrokeColor(0,250,50,100)
+															r:setStrokeColor(0,250,50,0.5)
 														end
 
 														if (lower(tag) == "a") then
 --print ("Yeah, tag = a")
-															local touchme = touchableBox(result, textDisplayReferencePoint, newDisplayLine.x, newDisplayLine.y - (fontInfo.capheight * size)/4,  w-2, fontInfo.capheight * size, hyperlinkFillColor)
+															local touchme = touchableBox(result, textDisplayReferencePoint, newDisplayLineGroup.x, newDisplayLineGroup.y - (fontInfo.capheight * size)/4,  w-2, fontInfo.capheight * size, hyperlinkFillColor)
 
 															attr.text = currentLine
-															attachLinkToObj(newDisplayLine, attr, handler)
+															attachLinkToObj(newDisplayLineGroup, attr, handler)
 														end
 
 
@@ -1538,8 +1544,8 @@ end
 													-- Not predictable! So, we capture the height of the first line, and that is the basis of
 													-- our y adjustment for the entire block, to position it correctly.
 													if (not yAdjustment or yAdjustment == 0) then
-														--yAdjustment = (size * fontInfo.ascent )- newDisplayLine.height
-														yAdjustment = ( (size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLine.height
+														--yAdjustment = (size * fontInfo.ascent )- newDisplayLineGroup.height
+														yAdjustment = ( (size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLineGroup.height
 													end
 
 													if (textwrapIsCached or (wordlen <= currentWidth * widthCorrection) ) then
@@ -1576,34 +1582,30 @@ if (testing) then
 	print ("B: render a word: "..word)
 	print ("\nrenderTextFromMargin reset to TRUE.")
 	print ("isFirstLine", isFirstLine)
-	print ("   newDisplayLine.y",lineY + baselineAdjustment, baselineAdjustment)
-	print ("   newDisplayLine HEIGHT:",newDisplayLine.height)
+	print ("   newDisplayLineGroup.y",lineY + baselineAdjustment, baselineAdjustment)
+	print ("   newDisplayLineGroup HEIGHT:",newDisplayLineGroup.height)
 	print ("leftIndent + currentFirstLineIndent + xOffset", leftIndent, currentFirstLineIndent, xOffset)
 end
 
-														local newDisplayLine = display.newGroup()
-														local newDisplayLineText = display.newText(newDisplayLine, word, x, lineY, font, size)
-														newDisplayLineText:setTextColor(color[1], color[2], color[3])
+														local newDisplayLineGroup = display.newGroup()
+														newDisplayLineGroup.anchorChildren = true
+
+														local newDisplayLineText = display.newText(newDisplayLineGroup, word, x, lineY, font, size)
+														newDisplayLineText:setFillColor(unpack(color))
 														newDisplayLineText.alpha = opacity
-														result:insert(newDisplayLine)
-														newDisplayLine:setReferencePoint(textDisplayReferencePoint)
+														result:insert(newDisplayLineGroup)
+														newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
 
 				--print ("textAlignment",textAlignment)
 				--print ("x + leftIndent + currentFirstLineIndent + currentXOffset", x, leftIndent, currentFirstLineIndent, currentXOffset)
 														if (lower(textAlignment) ~= "right") then
-															newDisplayLine.x = x + leftIndent + currentFirstLineIndent + currentXOffset
+															newDisplayLineGroup.x = x + leftIndent + currentFirstLineIndent + currentXOffset
 														else
-															newDisplayLine.x = x - currentXOffset
+															newDisplayLineGroup.x = x - currentXOffset
 														end
-														newDisplayLine.y = lineY + baselineAdjustment
+														newDisplayLineGroup.y = lineY + baselineAdjustment
 														lineCount = lineCount + 1
 														currentLine = ''
---print ("B: newDisplayLine.y",lineY + baselineAdjustment)
-														-- This line has now wrapped around, and the next one should
-														-- start at the margin.
-													-- ????
-														--renderTextFromMargin = true
-														--currentXOffset = 0
 
 														if (isFirstLine) then
 															currentLineHeight = 0
@@ -1615,12 +1617,12 @@ end
 
 
 														if (lower(tag) == "a") then
-															w = newDisplayLine.width
+															w = newDisplayLineGroup.width
 --print ("Yeah, tag = a")
-															local touchme = touchableBox(result, textDisplayReferencePoint, newDisplayLine.x, newDisplayLine.y - (fontInfo.capheight * size)/4,  w-2, fontInfo.capheight * size, hyperlinkFillColor)
+															local touchme = touchableBox(result, textDisplayReferencePoint, newDisplayLineGroup.x, newDisplayLineGroup.y - (fontInfo.capheight * size)/4,  w-2, fontInfo.capheight * size, hyperlinkFillColor)
 
 															attr.text = currentLine
-															attachLinkToObj(newDisplayLine, attr, handler)
+															attachLinkToObj(newDisplayLineGroup, attr, handler)
 														end
 
 
@@ -1674,6 +1676,12 @@ end
 								-- Add final line that didn't need wrapping
 								-- Add a space to deal with a weirdo bug that was deleting final words. ????
 
+if (testing) then
+	print ()
+	print ("----------------------------")
+	print ("C: Final line: ["..currentLine.."]", strlen(currentLine))
+	print ("isFirstLine", isFirstLine)
+end
 								if (isFirstLine) then
 									currentLineHeight = 0
 									isFirstLine = false
@@ -1696,12 +1704,8 @@ end
 
 
 if (testing) then
-	print ()
-	print ("----------------------------")
-	print ("C: Final line: ["..currentLine.."]", strlen(currentLine))
-	print ("\nStart at margin)", renderTextFromMargin)
+	print ("Start at margin)", renderTextFromMargin)
 	print ("Previous Line:", "["..prevTextInLine.."]", strlen(prevTextInLine))
-	print ("isFirstLine", isFirstLine)
 	print ("lineY:",lineY)
 	print ("currentSpaceBefore:",currentSpaceBefore)
 	if (currentSpaceBefore > 0) then
@@ -1714,48 +1718,58 @@ end
 
 --print ("C: render a line:", currentLine)
 
-									local newDisplayLine = display.newGroup()
-									local newDisplayLineText = display.newText(newDisplayLine, currentLine, x, lineY, font, size)
-									newDisplayLine.x, newDisplayLine.y = x, lineY
-									newDisplayLine.alpha = opacity
-									result:insert(newDisplayLine)
-									newDisplayLine:setReferencePoint(textDisplayReferencePoint)
-									newDisplayLineText:setTextColor(color[1], color[2], color[3])
+									local newDisplayLineGroup = display.newGroup()
+									newDisplayLineGroup.anchorChildren = true
+									
+									local newDisplayLineText = display.newText({
+										parent = newDisplayLineGroup,
+										text = currentLine,
+										x = 0, y = 0,
+										font = font,
+										fontSize = size,
+										align = lower(textAlignment) or "left",
+									})
+									newDisplayLineText.alpha = opacity
+									newDisplayLineText:setFillColor(unpack(color))
 
+									result:insert(newDisplayLineGroup)
+
+									-- GRAPHICS 2.0: text now is always centered around its x,y
+									-- so we must move it.
+									newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
+									newDisplayLineGroup.x, newDisplayLineGroup.y = x, lineY
+
+									
 									local ta = lower(textAlignment)
 --print ("Warning: textwrap has alignment to the left for everything in C section.")
 --ta = "left"
 
 									if (ta == "right") then
-										newDisplayLine.x = x + currentXOffset
-										currentXOffset = newDisplayLine.x - newDisplayLine.width
+										newDisplayLineGroup.x = x + currentXOffset
+										currentXOffset = newDisplayLineGroup.x - newDisplayLineGroup.width
 
-if (testing) then
-	print ("* currentXOffset",currentXOffset)
-end
-										--test:
-										--newDisplayLine.x = x
-										--currentXOffset = newDisplayLine.x + newDisplayLine.width
-										--newDisplayLine:setReferencePoint(display["BottomRightReferencePoint"])
+										newDisplayLineGroup:setReferencePoint(display["BottomRightReferencePoint"])
 									elseif (ta == "center") then
 										-- position from left because there is a rect giving us 0,0 positioning
-										newDisplayLine.x = x + leftIndent + currentXOffset
-										--newDisplayLine.x = floor(currentWidth/2) + leftIndent + firstLineIndent
+										newDisplayLineGroup:setReferencePoint(display["BottomLeftReferencePoint"])
+										newDisplayLineGroup.x = x + leftIndent + currentXOffset
+										--newDisplayLineGroup.x = floor(currentWidth/2) + leftIndent + firstLineIndent
 
-										currentXOffset = newDisplayLine.x + newDisplayLine.width
+										currentXOffset = newDisplayLineGroup.x + newDisplayLineGroup.width
 									else
-										newDisplayLine.x = x + leftIndent + currentXOffset
-										currentXOffset = newDisplayLine.x + newDisplayLine.width
+										-- LEFT:
+										newDisplayLineGroup:setReferencePoint(display["BottomLeftReferencePoint"])
+										newDisplayLineGroup.x = x + leftIndent + currentXOffset
+										currentXOffset = newDisplayLineGroup.x + newDisplayLineGroup.width
 									end
-									newDisplayLine.y = lineY + baselineAdjustment
+									newDisplayLineGroup.y = lineY + baselineAdjustment
 
 if (testing) then
-	print ("C: text —"..currentLine.."—")
-	print ("   newDisplayLine.y",lineY + baselineAdjustment)
-	print ("   newDisplayLine HEIGHT:",newDisplayLine.height)
+	print ("   newDisplayLineGroup.y: ",lineY + baselineAdjustment)
+	print ("   newDisplayLineGroup HEIGHT:",newDisplayLineGroup.height)
 	print ("  ")
 
-	newDisplayLineText:setTextColor(0,250,100,255)
+	--newDisplayLineText:setFillColor(0,250,100,1.0)
 end
 									-- Save the current line if we started at the margin
 									-- So the next line, if it has to, can start where this one ends.
@@ -1764,8 +1778,8 @@ end
 									-- Since line heights are not predictable, we capture the yAdjustment based on
 									-- the actual height the first rendered line of text
 									if (not yAdjustment or yAdjustment == 0) then
-										--yAdjustment = (size * fontInfo.ascent )- newDisplayLine.height
-										yAdjustment = ( (size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLine.height
+										--yAdjustment = (size * fontInfo.ascent )- newDisplayLineGroup.height
+										yAdjustment = ( (size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLineGroup.height
 									end
 
 									-- NOT working for right/centered styled text!
@@ -1775,26 +1789,27 @@ end
 										if (renderTextFromMargin) then
 											w = currentWidth
 										else
-											w = currentWidth - newDisplayLine.width
+											w = currentWidth - newDisplayLineGroup.width
 										end
 
 										if (ta == "left") then
-											w = newDisplayLine.width
+											w = newDisplayLineGroup.width
 										end
 
 										-- compensate for the stroke
-										local r = display.newRect(0,0,w-2,newDisplayLine.height-2)
-										r:setStrokeColor(0,250,250,100)
+										local r = display.newRect(0,0,w-2,newDisplayLineGroup.height-2)
+										r:setStrokeColor(150,0,0,125)
 										r.strokeWidth=1
 										result:insert(r)
+
 										r:setReferencePoint(textDisplayReferencePoint)
-										r.x = newDisplayLine.x+1
-										r.y = newDisplayLine.y+1
+										r.x = newDisplayLineGroup.x+1
+										r.y = newDisplayLineGroup.y+1
 										r.isVisible = testing
-										r:setFillColor(0,255,0,0) -- transparent
+										r:setFillColor(0,1,0,0) -- transparent
 
 										if (lower(tag) == "a") then
-											local touchme = touchableBox(result, textDisplayReferencePoint, newDisplayLine.x, newDisplayLine.y - (fontInfo.capheight * size)/4,  w-2, fontInfo.capheight * size, hyperlinkFillColor)
+											local touchme = touchableBox(result, textDisplayReferencePoint, newDisplayLineGroup.x, newDisplayLineGroup.y - (fontInfo.capheight * size)/4,  w-2, fontInfo.capheight * size, hyperlinkFillColor)
 											attr.text = currentLine
 											attachLinkToObj(touchme, attr, handler)
 										end
@@ -1806,8 +1821,6 @@ end
 
 								end
 
-
-
 								cache[cacheChunkCtr] = cachedChunk
 								cacheChunkCtr = cacheChunkCtr + 1
 								return result
@@ -1818,19 +1831,8 @@ end
 							------------------------------------------------------------
 
 
-
-
 							local chunk = renderChunk( tag )
-							result:insert(chunk)
-
-
-							-- Restore style settings
-							-- If we came in with italics set, then the tag set the font
-							-- to bold-italic, this will restore the font back to italic.
-							--setStyleSettings(styleSettings)
-
-
-							return result
+							return chunk
 						end -- renderParsedElement()
 
 					-- save the style settings as they are before
@@ -1904,8 +1906,8 @@ end
 					if (tag == "a") then
 						setStyleFromTag (tag, attr)
 					end
-					
-					
+
+
 					-- LIST ITEMS: add a bullet or number
 					if (tag == "li") then
 						-- default for list is a disk.
@@ -1932,15 +1934,15 @@ end
 						if (type(element) == "table") then
 							local e = renderParsedText(element, element._tag, element._attr, parseDepth, stacks)
 							result:insert(e)
+							e.anchorX, e.anchorY = 0, 0
 						else
 							if (not element) then
 								print ("***** WARNING, EMPTY ELEMENT**** ")
 							end
 
 							local e = renderParsedElement(n, element, tag, attr)
-
 							result:insert(e)
-
+							e.anchorX, e.anchorY = 0, 0
 							elementCounter = elementCounter + 1
 						end
 
@@ -1953,12 +1955,12 @@ end
 						renderTextFromMargin = true
 						lineY = lineY + currentSpaceAfter
 						--lineY = lineY + lineHeight + currentSpaceAfter
-			elementCounter = 1
+						elementCounter = 1
 					elseif (tag == "li") then
 						setStyleFromTag (tag, attr)
 						renderTextFromMargin = true
 						lineY = lineY + currentSpaceAfter
-			elementCounter = 1
+						elementCounter = 1
 					elseif (tag == "ul") then
 						setStyleFromTag (tag, attr)
 						renderTextFromMargin = true
@@ -1966,7 +1968,7 @@ end
 						--leftIndent = leftIndent - stacks.list[stacks.list.ptr].indent
 						stacks.list[stacks.list.ptr] = nil
 						stacks.list.ptr = stacks.list.ptr -1
-			elementCounter = 1
+						elementCounter = 1
 					elseif (tag == "ol") then
 						setStyleFromTag (tag, attr)
 						renderTextFromMargin = true
@@ -1974,13 +1976,13 @@ end
 						--leftIndent = leftIndent - stacks.list[stacks.list.ptr].indent
 						stacks.list[stacks.list.ptr] = nil
 						stacks.list.ptr = stacks.list.ptr -1
-			elementCounter = 1
+						elementCounter = 1
 					elseif (tag == "br") then
 						renderTextFromMargin = true
 						currentXOffset = 0
 						setStyleFromTag (tag, attr)
 						lineY = lineY + currentSpaceAfter
-			elementCounter = 1
+						elementCounter = 1
 					elseif (tag == "#document") then
 						-- lines from non-HTML text will be tagged #document
 						-- and this will handle them.
@@ -1988,7 +1990,7 @@ end
 						currentXOffset = 0
 						setStyleFromTag (tag, attr)
 						lineY = lineY + currentSpaceAfter
---			elementCounter = 1
+--						elementCounter = 1
 					end
 
 					--print ("Restore style settings", color[1], tag)
@@ -1996,7 +1998,6 @@ end
 					-- entering the tag
 
 					setStyleSettings(styleSettings)
-
 					return result
 				end -- end function renderParsedText
 
@@ -2008,6 +2009,7 @@ end
 
 				local e = renderParsedText(parsedText, parsedText._tag, parsedText._attr)
 				result:insert(e)
+				e.anchorX, e.anchorY = 0, 0
 
 				-- This keeps centered/right aligned objects in the right place
 				-- The line is built inside a rect of the correct width
@@ -2025,6 +2027,7 @@ end
 			-- Render this chunk of XML
 			local oneXMLBlock = renderXML(restOLine)
 			result:insert(oneXMLBlock)
+			oneXMLBlock.anchorX, oneXMLBlock.anchorY = 0, 0
 
 		end -- html elements for one paragraph
 

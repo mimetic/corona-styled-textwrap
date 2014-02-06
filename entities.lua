@@ -333,9 +333,9 @@ end
 
 local gsub, char = string.gsub, string.char
 local entitySwap = function(orig,n,s)
-	s = to_utf8(tonumber(character_entities[s]))
-	--print ("entitySwap: orig,n,s,ss",orig,n,s)
-	return s or n=="#" and to_utf8(s) or orig
+	local ss = to_utf8(tonumber(character_entities[s]))
+	--print ("entitySwap: orig,n,s,ss",orig,ss,n,s)
+	return ss or n=="#" and to_utf8(s) or orig
 end
 function M.unescape(str)
 	return gsub( str, '(&(#?)([%d%a]+);)', entitySwap )
