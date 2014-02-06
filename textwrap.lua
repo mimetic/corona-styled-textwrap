@@ -35,7 +35,7 @@
 
 
 -- TESTING
-local testing = false
+local testing = true
 
 
 
@@ -625,7 +625,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			-- Right Indent
 			params.rightIndent = rightIndent
 			params.textAlignment = textAlignment
-
 			return params
 		end
 
@@ -706,7 +705,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			if (params[10] and params[10] ~= "") then case = funx.trim(params[10]) end
 
 			-- space before paragraph
-			if (params[12] and params[12] ~= "") then spaceBefore = tonumber(params[13]) end
+			if (params[12] and params[12] ~= "") then spaceBefore = tonumber(params[12]) end
 			-- space after paragraph
 			if (params[13] and params[13] ~= "") then spaceAfter = tonumber(params[13]) end
 			-- First Line Indent
@@ -927,7 +926,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	-- which is right since it is escaped HTML.
 	for line in gmatch(text, oneLinePattern) do
 		local command, commandline
-		local currentFirstLineIndent, currentSpaceAfter, currentSpaceBefore
+		local currentSpaceAfter, currentSpaceBefore
 
 		local lineEnd = substring(line,-1,-1)
 		local q = funx.escape(lineEnd)
@@ -1079,6 +1078,7 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 					currentFirstLineIndent = firstLineIndent
 					currentSpaceBefore = spaceBefore
 					currentSpaceAfter = spaceAfter
+					isFirstLine = true
 				end
 
 				if (lineBreakType == "soft") then
@@ -1186,7 +1186,7 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 				local function renderParsedText(parsedText, tag, attr, parseDepth, stacks)
 
 					local result = display.newGroup()
-					
+
 					parseDepth = parseDepth or 0
 					parseDepth = parseDepth + 1
 
@@ -1405,10 +1405,13 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 				--]]
 
 													if (isFirstLine) then
-														currentLineHeight = 0
+														currentLineHeight = lineHeight
 														isFirstLine = false
+														currentFirstLineIndent = firstLineIndent
 													else
 														currentLineHeight = lineHeight
+														currentFirstLineIndent = 0
+
 													end
 
 													local xOffset = 0
@@ -1430,7 +1433,7 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 
 													local newDisplayLineGroup = display.newGroup()
 													newDisplayLineGroup.anchorChildren = true
-													
+
 													local newDisplayLineText = display.newText({
 														parent=newDisplayLineGroup,
 														text=currentLine,
@@ -1441,7 +1444,7 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 													})
 													newDisplayLineText:setFillColor(unpack(color))
 													newDisplayLineText.alpha = opacity
-													
+
 													result:insert(newDisplayLineGroup)
 													newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
 													if (lower(textAlignment) == "Center") then
@@ -1587,6 +1590,17 @@ if (testing) then
 	print ("leftIndent + currentFirstLineIndent + xOffset", leftIndent, currentFirstLineIndent, xOffset)
 end
 
+														if (isFirstLine) then
+															currentLineHeight = lineHeight
+															isFirstLine = false
+															currentFirstLineIndent = firstLineIndent
+														else
+															-- If this is the first line of a new paragraph, move to next line
+															currentLineHeight = lineHeight
+															currentFirstLineIndent = 0
+
+														end
+
 														local newDisplayLineGroup = display.newGroup()
 														newDisplayLineGroup.anchorChildren = true
 
@@ -1607,15 +1621,16 @@ end
 														lineCount = lineCount + 1
 														currentLine = ''
 
-														if (isFirstLine) then
-															currentLineHeight = 0
-															isFirstLine = false
-														else
-															-- If this is the first line of a new paragraph, move to next line
-															currentLineHeight = lineHeight
-														end
-
-
+--														if (isFirstLine) then
+--															currentLineHeight = 0
+--															isFirstLine = false
+--															currentFirstLineIndent = firstLineIndent
+--														else
+--															-- If this is the first line of a new paragraph, move to next line
+--															currentLineHeight = lineHeight
+--														end
+--
+--
 														if (lower(tag) == "a") then
 															w = newDisplayLineGroup.width
 --print ("Yeah, tag = a")
@@ -1683,9 +1698,10 @@ if (testing) then
 	print ("isFirstLine", isFirstLine)
 end
 								if (isFirstLine) then
-									currentLineHeight = 0
+									currentLineHeight = lineHeight
 									isFirstLine = false
-									lineY = lineY + currentSpaceBefore
+									lineY = lineY + lineHeight + currentSpaceBefore
+									currentFirstLineIndent = firstLineIndent
 								else
 									-- If this is the first line of a new paragraph, move to next line
 									currentLineHeight = lineHeight
@@ -1694,6 +1710,7 @@ end
 										currentXOffset = 0
 										lineY = lineY + currentLineHeight + currentSpaceBefore
 									end
+									currentFirstLineIndent = 0
 								end
 
 								if (not textwrapIsCached) then
@@ -1720,7 +1737,7 @@ end
 
 									local newDisplayLineGroup = display.newGroup()
 									newDisplayLineGroup.anchorChildren = true
-									
+
 									local newDisplayLineText = display.newText({
 										parent = newDisplayLineGroup,
 										text = currentLine,
@@ -1739,7 +1756,7 @@ end
 									newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
 									newDisplayLineGroup.x, newDisplayLineGroup.y = x, lineY
 
-									
+
 									local ta = lower(textAlignment)
 --print ("Warning: textwrap has alignment to the left for everything in C section.")
 --ta = "left"
@@ -1759,7 +1776,7 @@ end
 									else
 										-- LEFT:
 										newDisplayLineGroup:setReferencePoint(display["BottomLeftReferencePoint"])
-										newDisplayLineGroup.x = x + leftIndent + currentXOffset
+										newDisplayLineGroup.x = x + leftIndent + currentFirstLineIndent + currentXOffset
 										currentXOffset = newDisplayLineGroup.x + newDisplayLineGroup.width
 									end
 									newDisplayLineGroup.y = lineY + baselineAdjustment
@@ -1901,6 +1918,7 @@ end
 						end
 
 					elseif (tag == "br") then
+
 					end
 
 					if (tag == "a") then
@@ -1947,19 +1965,23 @@ end
 						end
 
 					end -- end for
-
+					
 					-- Close tags
 					-- AFTER rendering (so add afterspacing!)
 					if (tag == "p" or tag == "div") then
 						setStyleFromTag (tag, attr)
 						renderTextFromMargin = true
 						lineY = lineY + currentSpaceAfter
+						-- Reset the first line of paragraph flag
+						isFirstLine = true
 						--lineY = lineY + lineHeight + currentSpaceAfter
 						elementCounter = 1
 					elseif (tag == "li") then
 						setStyleFromTag (tag, attr)
 						renderTextFromMargin = true
 						lineY = lineY + currentSpaceAfter
+						-- Reset the first line of paragraph flag
+						isFirstLine = true
 						elementCounter = 1
 					elseif (tag == "ul") then
 						setStyleFromTag (tag, attr)
@@ -1976,12 +1998,16 @@ end
 						--leftIndent = leftIndent - stacks.list[stacks.list.ptr].indent
 						stacks.list[stacks.list.ptr] = nil
 						stacks.list.ptr = stacks.list.ptr -1
+						-- Reset the first line of paragraph flag
+						isFirstLine = true
 						elementCounter = 1
 					elseif (tag == "br") then
 						renderTextFromMargin = true
 						currentXOffset = 0
 						setStyleFromTag (tag, attr)
 						lineY = lineY + currentSpaceAfter
+						-- Reset the first line of paragraph flag
+						isFirstLine = true
 						elementCounter = 1
 					elseif (tag == "#document") then
 						-- lines from non-HTML text will be tagged #document

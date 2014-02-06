@@ -128,7 +128,7 @@ local DMC_KOMPATIBLE_DEFAULTS = {
 
 	-- G1 deprecated methods
 	activate_reference=true,
-	activate_fillcolor=true,
+	activate_fillcolor=false,
 	activate_strokecolor=true,
 }
 

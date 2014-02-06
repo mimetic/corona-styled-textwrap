@@ -1,2 +1,2 @@
 # style = font, size, leading, R,G,B, width, opacity, NORMAL|ALL_CAPS, text alignment, spaceBefore, spaceAfter, firstLineIndent, leftIndent, rightIndent
-Normal = Avenir,16,20,0,0,0,,100%,NORMAL,left,20,0,0,0,0
+Normal = Avenir,16,20,0,0,0,,100%,NORMAL,left,50,0,14,15,16
