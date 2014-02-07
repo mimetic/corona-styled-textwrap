@@ -38,11 +38,15 @@
 local testing = false
 
 
+-- Main var for this module
+local T = {}
+
 
 local funx = require ("funx")
 local html = require ("html")
 local entities = require ("entities")
 
+-- functions
 local max = math.max
 local lower = string.lower
 local gmatch = string.gmatch
@@ -55,17 +59,13 @@ local gfind = string.gfind
 
 
 -- Useful constants
-local OPAQUE = 1
+local OPAQUE = 255
 local TRANSPARENT = 0
 
 -- Be sure a caches dir is set up inside the system caches
 local textWrapCacheDir = "textwrap"
 --funx.mkdir (textWrapCacheDir, "",false, system.CachesDirectory)
 
-
-
--- functions
-local floor = math.floor
 
 -- testing function
 local function showTestLine(group, y, isFirstTextInBlock, i)
@@ -76,13 +76,10 @@ local function showTestLine(group, y, isFirstTextInBlock, i)
 	else
 		q:setColor(80 * i,80 * i, 80)
 	end
-	q.width = 2
+	q.strokeWidth = 2
 end
 
 
-
--- Main var for this module
-local T = {}
 
 -- Use "." at the beginning of a line to add spaces before it.
 local usePeriodsForLineBeginnings = false
@@ -102,6 +99,7 @@ local fontFaces = fontMetrics.metrics.variations or {}
 -- This table can be used to check if a tag is an inline tag:
 -- if (inline[tag]) then...
 -------------------------------------------------
+--[[
 local inline = {
 	a = true,
 	abbr = true,
@@ -141,7 +139,7 @@ local inline = {
 	u = true,
 	var = true,
 }
-
+--]]
 
 --------------------------------------------------------
 -- Common functions redefined for speed
@@ -558,6 +556,25 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local leftIndent = 0
 	local rightIndent = 0
 	local bullet = "&#9679;"
+	
+	-- Combine a bunch of local variables into a settings array because we have too many "upvalues"!!!
+	local settings = {
+		font = font,
+		size = size,
+		color = color,
+		width = width,
+		opacity = opacity,
+		targetDeviceScreenSize = targetDeviceScreenSize,
+		case = case,
+		spaceBefore = spaceBefore,
+		spaceAfter = spaceAfter,
+		firstLineIndent = firstLineIndent,
+		currentFirstLineIndent = currentFirstLineIndent,
+		leftIndent = leftIndent,
+		rightIndent = rightIndent,
+		bullet = bullet,
+	}
+	
 
 	------ POSITIONING RECT
 	-- Need a positioning rect so that indents work.
@@ -701,7 +718,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				minLineCharCount = minCharCount or 5
 			end
 			-- opacity
-			if (params[9] and params[9] ~= "") then opacity = funx.applyPercent(params[9],1) end
+			if (params[9] and params[9] ~= "") then opacity = funx.applyPercent(params[9], OPAQUE) end
 			-- case (upper/normal)
 			if (params[10] and params[10] ~= "") then case = funx.trim(params[10]) end
 
@@ -795,7 +812,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			end
 
 			-- opacity
-			if (format.opacity) then opacity = funx.applyPercent(format.opacity,1) end
+			if (format.opacity) then opacity = funx.applyPercent(format.opacity, OPAQUE) end
 
 			-- case (upper/normal) using legacy coding ("case")
 			if (format.case) then
@@ -1300,7 +1317,7 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 							-- and have the text actually go there.
 							local resultPosRect = display.newRect(result,0,0,1,1)
 							resultPosRect.anchorX, resultPosRect.anchorY = 0,0
-							resultPosRect:setFillColor(1,0,0,1)
+							resultPosRect:setFillColor(1,0,0, 1)
 							resultPosRect.isVisible = false
 
 
@@ -1438,6 +1455,7 @@ A: Render text that fills the entire line
 													fontSize = size,
 													align = lower(textAlignment) or "left",
 												})
+print ("COLOR")
 												newDisplayLineText:setFillColor(unpack(color))
 												newDisplayLineText.alpha = opacity
 
