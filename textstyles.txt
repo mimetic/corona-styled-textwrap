@@ -1,3 +1,4 @@
 # style = font, size, leading, R,G,B, width, opacity, NORMAL|ALL_CAPS, text alignment, spaceBefore, spaceAfter, firstLineIndent, leftIndent, rightIndent
 Normal = Avenir,16,20,0,0,0,,100%,NORMAL,left,,10,,40,50
 Right = Avenir,16,20,0,0,0,,100%,NORMAL,right,40,5,,20,20
+Center = Avenir,16,20,0,0,0,,100%,NORMAL,center,,,,40,20

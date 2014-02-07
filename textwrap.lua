@@ -35,7 +35,7 @@
 
 
 -- TESTING
-local testing = true
+local testing = false
 
 
 
@@ -1443,9 +1443,11 @@ A: Render text that fills the entire line
 
 												result:insert(newDisplayLineGroup)
 												newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
-												if (lower(textAlignment) == "center") then
-													newDisplayLineGroup.x = floor(currentWidth/2)  + x + leftIndent + currentFirstLineIndent + xOffset
-												elseif (lower(textAlignment) == "right") then
+
+												local ta = lower(textAlignment)												
+												if (ta == "center") then
+													newDisplayLineGroup.x = x + leftIndent + currentFirstLineIndent + xOffset
+												elseif (ta == "right") then
 													newDisplayLineGroup.x = x - xOffset
 												else
 													newDisplayLineGroup.x = x + leftIndent + currentFirstLineIndent + xOffset
@@ -1603,11 +1605,14 @@ end
 
 			--print ("textAlignment",textAlignment)
 			--print ("x + leftIndent + currentFirstLineIndent + currentXOffset", x, leftIndent, currentFirstLineIndent, currentXOffset)
+													local ta = lower(textAlignment)
+
 													if (lower(textAlignment) ~= "right") then
 														newDisplayLineGroup.x = x + leftIndent + currentFirstLineIndent + currentXOffset
 													else
 														newDisplayLineGroup.x = x - currentXOffset
 													end
+													
 													newDisplayLineGroup.y = lineY + baselineAdjustment
 													lineCount = lineCount + 1
 													currentLine = ''
@@ -1749,9 +1754,8 @@ end
 								newDisplayLineGroup.x, newDisplayLineGroup.y = x, lineY
 
 
+								-- ALIGNMENT
 								local ta = lower(textAlignment)
---print ("Warning: textwrap has alignment to the left for everything in C section.")
---ta = "left"
 
 								if (ta == "right") then
 									newDisplayLineGroup.x = x + currentXOffset
@@ -1760,25 +1764,22 @@ end
 									newDisplayLineGroup:setReferencePoint(display["BottomRightReferencePoint"])
 								elseif (ta == "center") then
 									-- position from left because there is a rect giving us 0,0 positioning
-									newDisplayLineGroup:setReferencePoint(display["BottomLeftReferencePoint"])
-									newDisplayLineGroup.x = x + leftIndent + currentXOffset
-									--newDisplayLineGroup.x = floor(currentWidth/2) + leftIndent + firstLineIndent
-
+									newDisplayLineGroup.x = x + leftIndent + currentFirstLineIndent + currentXOffset
 									currentXOffset = newDisplayLineGroup.x + newDisplayLineGroup.width
 								else
 									-- LEFT:
-									newDisplayLineGroup:setReferencePoint(display["BottomLeftReferencePoint"])
+									--newDisplayLineGroup:setReferencePoint(display["BottomLeftReferencePoint"])
 									newDisplayLineGroup.x = x + leftIndent + currentFirstLineIndent + currentXOffset
 									currentXOffset = newDisplayLineGroup.x + newDisplayLineGroup.width
 								end
 								newDisplayLineGroup.y = lineY + baselineAdjustment
 
 if (testing) then
-print ("   newDisplayLineGroup.y: ",lineY + baselineAdjustment)
-print ("   newDisplayLineGroup HEIGHT:",newDisplayLineGroup.height)
-print ("  ")
+	print ("   newDisplayLineGroup.y: ",lineY + baselineAdjustment)
+	print ("   newDisplayLineGroup HEIGHT:",newDisplayLineGroup.height)
+	print ("  ")
 
---newDisplayLineText:setFillColor(0,250,100,1.0)
+	--newDisplayLineText:setFillColor(0,250,100,1.0)
 end
 								-- Save the current line if we started at the margin
 								-- So the next line, if it has to, can start where this one ends.
@@ -1790,9 +1791,8 @@ end
 									--yAdjustment = (size * fontInfo.ascent )- newDisplayLineGroup.height
 									yAdjustment = ( (size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLineGroup.height
 								end
-
-								-- NOT working for right/centered styled text!
-								-- *** This is needed so right/center justified lines are correctly positioned!!!
+								
+								-- RECT: DRAW A RECT AROUND THE TEXT FOR <A> uses
 								if (true) then
 									local w
 									if (renderTextFromMargin) then
