@@ -435,13 +435,15 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	end
 
 	-- Caching values
+	-- Name the cache with the width, too, so the same text isn't wrapped to the wrong
+	-- width based on the cache.
 	local textUID = 0
 	local textwrapIsCached = false
 	local cache = { { text = "", width = "", } }
 	local cacheChunkCtr = 1
 
 	if ( cacheDir and cacheDir ~= "" ) then
-		textUID = "cache"..funx.checksum(text)
+		textUID = "cache"..funx.checksum(text).."_"..tostring(width)
 		local res = loadTextWrapFromCache(textUID, cacheDir)
 		if (res) then
 			textwrapIsCached = true
@@ -564,13 +566,12 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	-- THIS WILL FAIL. SO, IF THE "ALIGN" IS SET TO CENTER, FOR SOME LEGACY REASON, BUT THE FIRST
 	-- LINE IS OTHERWISE, THIS WILL FAIL. FUCK.
 	--local r = display.newRect(0,0,width,10)
-	local r = display.newRect(0,0,0,1)
-	r:setFillColor(255,0,0)
+	local r = display.newRect(0,0,5,5)
+	r:setFillColor(255,0,0,255)
 	result:insert(r)
 	result._positionRect = r
 	r.strokeWidth=0
-	r:setReferencePoint(display["Bottom" .. textAlignment .. "ReferencePoint"])
-	--r:setReferencePoint(display["Bottom" .. "Left" .. "ReferencePoint"])
+	r.anchorX, r.anchorY = 0,0
 	r.x = 0
 	r.y = 0
 	r.isVisible = testing
@@ -723,13 +724,12 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 					x = width - rightIndent
 					currentFirstLineIndent = 0
 					firstLineIndent = 0
-				elseif (lower(textAlignment) == "left") then
-					x = 0
-				else
+				elseif (lower(textAlignment) == "center") then
 					local currentWidth = width - leftIndent - rightIndent -- firstLineIndent
 					x = floor(currentWidth/2) --+ firstLineIndent
+				else
+					x = 0
 				end
-
 			end
 		end
 
@@ -983,11 +983,11 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 						x = width - rightIndent
 						currentFirstLineIndent = 0
 						firstLineIndent = 0
-					elseif (lower(textAlignment) == "left") then
-						x = 0
-					else
+					elseif  (lower(textAlignment) == "center") then
 						local currentWidth = width - leftIndent - rightIndent -- currentFirstLineIndent
 						x = floor(currentWidth/2) --+ currentFirstLineIndent
+					else
+						x = 0
 					end
 				end
 
@@ -1036,7 +1036,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				local result = display.newGroup()
 				result.anchorChildren = true
 
-				-- Need a positioning rect so that indents work.
 if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 
 
@@ -1134,8 +1133,10 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 					--end
 
 
-				-- Width of the text column
-				local currentWidth = width - leftIndent - rightIndent - currentFirstLineIndent
+				-- Width of the text column (not including indents which are paragraph based)
+				local currentWidth = width
+				--local currentWidth = width - leftIndent - rightIndent - currentFirstLineIndent
+
 				-- Get min characters to start with
 				-- We now know the max char width in a font,
 				-- so we can start with a minimum based on that.
@@ -1237,6 +1238,11 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 								setStyleFromTag (tag, attr)
 							end
 
+
+							-- Set the current width of the column, factoring in indents
+							local currentWidth = width - leftIndent - rightIndent - currentFirstLineIndent
+
+
 							------------------------------------------------
 							-- Refigure font metrics if font has changed
 							------------------------------------------------
@@ -1266,29 +1272,14 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 							-- to position the ENTIRE box properly (yAdjustment).
 							-- The current line height is NOT the leading/lineheight as with other lines,
 							-- since the box should start at the Cap Height (ascender).
-
-							if (isFirstTextInBlock) then
-								currentSpaceBefore = 0
-								-- position ascent of font at initial y value
-								-- yAdjustment is used by calling functions to adjust
-								-- where they place the text block to get it right.
-								--yAdjustment = (size * fontInfo.capheight) - baseline
-								-- For rendering using ReferencePoint at Bottom
-								--yAdjustment = size - (size * fontInfo.ascent)
-								isFirstTextInBlock = false
-							end
-
+							
 							------
 							-- Calc the adjustment so we position text at its baseline, not top-left corner
 							-- For rendering using Reference Point TopLeft
-							--baselineAdjustment = floor((size * fontInfo.capheight) - baseline)
-							-- For rendering using Reference Point BottomLeft
-							--baselineAdjustment = floor((size * fontInfo.capheight) - baseline)
-							baselineAdjustment = 0--(size/fontInfo.sampledFontSize) * fontInfo.textHeight
---print ("Baseline Adjustment for size "..size.." is "..baselineAdjustment)
---funx.dump(fontInfo)
---print ("  ")
+							baselineAdjustment = 0
 
+							------------------------------------------------
+							-- RENDER TEXT OBJECT
 							------------------------------------------------
 							--[[
 							 Render a chunk of the text object.
@@ -1298,328 +1289,328 @@ if (not width) then print ("textwrap: line 844: Damn, the width is wacked"); end
 
 							 A chunk to render is ALWAYS pure text. All HTML formatting is outside it.
 							--]]
-							----------------
-							local function renderChunk()
 
-								local tempLineWidth, words
-								local tempDisplayLine, tempDisplayLineTxt, tempDisplayLineR
 
-								local result = display.newGroup()
+							local tempLineWidth, words
+							local tempDisplayLine, tempDisplayLineTxt, tempDisplayLineR
 
-								-- Set the reference point to match the text alignment
-								textDisplayReferencePoint = display["Bottom"..textAlignment.."ReferencePoint"]
+							local result = display.newGroup()
+							
+							-- Create a positioning rect top-left, so we can indent from the left or right
+							-- and have the text actually go there.
+							local resultPosRect = display.newRect(result,0,0,1,1)
+							resultPosRect.anchorX, resultPosRect.anchorY = 0,0
+							resultPosRect:setFillColor(1,0,0,1)
+							resultPosRect.isVisible = false
 
-								-- Preserve initial padding before first word
-								local  _, _, padding = find(nextChunk, "^([%s%-]*)")
-								padding = padding or ""
-								local firstWord = true
 
-								-- Get chunks of text to iterate over to figure out line line wrap
-								local words
+							-- Set the reference point to match the text alignment
+							textDisplayReferencePoint = display["Bottom"..textAlignment.."ReferencePoint"]
 
-								-- If the line wrapping is cached, get it
-								local cachedChunk
-								local cachedChunkLine = 1
-								if (textwrapIsCached) then
-									cachedChunk = cache[cacheChunkCtr]
-									--words = gmatch(cachedChunk.text, "[^\r\n]+")
-									words = iteratorOverCacheText(cachedChunk.text)
-								else
-									cachedChunk = { text = {}, width = {} }
-									words = gmatch(nextChunk, "([^%s%-]+)([%s%-]*)")
-								end
+							-- Preserve initial padding before first word
+							local  _, _, padding = find(nextChunk, "^([%s%-]*)")
+							padding = padding or ""
+							local firstWord = true
 
-								local tempLine, allTextInLine
+							-- Get chunks of text to iterate over to figure out line line wrap
+							local words
 
-								---------------------------------------------
-								for word, spacer in words do
-									if (not textwrapIsCached) then
-										if (firstWord) then
-											word = padding .. word
-											firstWord = false
-										end
+							-- If the line wrapping is cached, get it
+							local cachedChunk
+							local cachedChunkLine = 1
+							if (textwrapIsCached) then
+								cachedChunk = cache[cacheChunkCtr]
+								--words = gmatch(cachedChunk.text, "[^\r\n]+")
+								words = iteratorOverCacheText(cachedChunk.text)
+							else
+								cachedChunk = { text = {}, width = {} }
+								words = gmatch(nextChunk, "([^%s%-]+)([%s%-]*)")
+							end
 
-										tempLine = currentLine..shortword..word..spacer
-									else
-										spacer = ""
-										tempLine = word
+							local tempLine, allTextInLine
+
+							---------------------------------------------
+							for word, spacer in words do
+								if (not textwrapIsCached) then
+									if (firstWord) then
+										word = padding .. word
+										firstWord = false
 									end
-									allTextInLine = prevTextInLine .. tempLine
 
-									-- Grab the first words of the line, until "minLineCharCount" hit
-									if (textwrapIsCached or (strlen(allTextInLine) > minLineCharCount)) then
+									tempLine = currentLine..shortword..word..spacer
+								else
+									spacer = ""
+									tempLine = word
+								end
+								allTextInLine = prevTextInLine .. tempLine
 
-										-- Allow for lines with beginning spaces, for positioning
-										if (usePeriodsForLineBeginnings and substring(currentLine,1,1) == ".") then
-											currentLine = substring(currentLine,2,-1)
-										end
+								-- Grab the first words of the line, until "minLineCharCount" hit
+								if (textwrapIsCached or (strlen(allTextInLine) > minLineCharCount)) then
 
-										-- If a word is less than the minimum word length, force it to be with the next word,so lines don't end with single letter words.
-										if (not textwrapIsCached and (strlen(allTextInLine) < nextChunkLen) and strlen(word) < minWordLen) then
-											shortword = shortword..word..spacer
+									-- Allow for lines with beginning spaces, for positioning
+									if (usePeriodsForLineBeginnings and substring(currentLine,1,1) == ".") then
+										currentLine = substring(currentLine,2,-1)
+									end
 
-										else
-											if (not textwrapIsCached) then
-												-- add a word
-												--local tempLine = currentLine..shortword..word..spacer
+									-- If a word is less than the minimum word length, force it to be with the next word,so lines don't end with single letter words.
+									if (not textwrapIsCached and (strlen(allTextInLine) < nextChunkLen) and strlen(word) < minWordLen) then
+										shortword = shortword..word..spacer
 
-												-- Draw the text as a line.
-												tempDisplayLine = display.newGroup()
-												--local tempDisplayLineTxt = display.newText(tempDisplayLine, funx.trim(tempLine), x, 0, font, size)
+									else
+										if (not textwrapIsCached) then
+											-- add a word
+											--local tempLine = currentLine..shortword..word..spacer
 
-												tempDisplayLineTxt = display.newText(tempDisplayLine, tempLine, x, 0, font, size)
-												tempDisplayLineTxt:setReferencePoint(display.TopLeftReferencePoint)
-												tempDisplayLineTxt.x = 0
-												tempDisplayLineTxt.y = 0
-												tempDisplayLineR = display.newRect(tempDisplayLine, 0,0,1,1)
-												tempDisplayLineR:setReferencePoint(display.TopLeftReferencePoint)
-												tempDisplayLineR.x = 0
-												tempDisplayLineR.y = 0
+											-- Draw the text as a line.
+											tempDisplayLine = display.newGroup()
+											--local tempDisplayLineTxt = display.newText(tempDisplayLine, funx.trim(tempLine), x, 0, font, size)
 
-												-- Is this line of text too long? In which case we render the line
-												-- as text, then move down a line on the screen and start again.
-												if (renderTextFromMargin) then
-													tempLineWidth = tempDisplayLine.width
-												else
-													tempLineWidth = tempDisplayLine.width + currentXOffset
-												end
+											tempDisplayLineTxt = display.newText(tempDisplayLine, tempLine, x, 0, font, size)
+											tempDisplayLineTxt:setReferencePoint(display.TopLeftReferencePoint)
+											tempDisplayLineTxt.x = 0
+											tempDisplayLineTxt.y = 0
+											tempDisplayLineR = display.newRect(tempDisplayLine, 0,0,1,1)
+											tempDisplayLineR:setReferencePoint(display.TopLeftReferencePoint)
+											tempDisplayLineR.x = 0
+											tempDisplayLineR.y = 0
 
-
+											-- Is this line of text too long? In which case we render the line
+											-- as text, then move down a line on the screen and start again.
+											if (renderTextFromMargin) then
+												tempLineWidth = tempDisplayLine.width
 											else
-												-- CACHED LINE
-												tempLineWidth = cachedChunk.width[cachedChunkLine]
+												tempLineWidth = tempDisplayLine.width + currentXOffset
 											end
 
 
+										else
+											-- CACHED LINE
+											tempLineWidth = cachedChunk.width[cachedChunkLine]
+										end
 
-											if (tempLineWidth <= currentWidth * widthCorrection )  then
-												currentLine = tempLine
-											else
-												if ( maxHeight==0 or (lineY <= maxHeight - currentLineHeight)) then
 
-				-- A: line render
-				--[[
-				print ()
-				print ("------------------------------")
-				print ("A: render a line: ["..currentLine.."] (start at margin?)", renderTextFromMargin)
-				--]]
+
+										if (tempLineWidth <= currentWidth * widthCorrection )  then
+											currentLine = tempLine
+										else
+											if ( maxHeight==0 or (lineY <= maxHeight - currentLineHeight)) then
+
+--[[
+A: Render text that fills the entire line
+--]]
+
+												if (isFirstLine) then
+													currentLineHeight = lineHeight
+													isFirstLine = false
+													currentFirstLineIndent = firstLineIndent
+													lineY = lineY + currentLineHeight + currentSpaceBefore
+												else
+													currentLineHeight = lineHeight
+													currentFirstLineIndent = 0
+													lineY = lineY + currentLineHeight
+												end
+
+												local xOffset = 0
+												-- This new line is at the old line baseline + leading
+												if (renderTextFromMargin) then
+													
+												else
+													xOffset = currentXOffset
+												end
+			--print ("xOffset, currentXOffset",xOffset, currentXOffset)
+
+												if (textwrapIsCached) then
+													currentLine = word
+												else
+													cachedChunk.text[cachedChunkLine] = currentLine
+													cachedChunk.width[cachedChunkLine] = tempLineWidth
+												end
+												cachedChunkLine = cachedChunkLine + 1
+
+												local newDisplayLineGroup = display.newGroup()
+												newDisplayLineGroup.anchorChildren = true
+
+												local newDisplayLineText = display.newText({
+													parent=newDisplayLineGroup,
+													text=currentLine,
+													x=0, y=0,
+													font=font,
+													fontSize = size,
+													align = lower(textAlignment) or "left",
+												})
+												newDisplayLineText:setFillColor(unpack(color))
+												newDisplayLineText.alpha = opacity
+
+												result:insert(newDisplayLineGroup)
+												newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
+												if (lower(textAlignment) == "center") then
+													newDisplayLineGroup.x = floor(currentWidth/2)  + x + leftIndent + currentFirstLineIndent + xOffset
+												elseif (lower(textAlignment) == "right") then
+													newDisplayLineGroup.x = x - xOffset
+												else
+													newDisplayLineGroup.x = x + leftIndent + currentFirstLineIndent + xOffset
+												end
+
+												-- record the width of the current line
+												-- in case we need to add the next
+												-- chunk to the end of it
+												--currentXOffset = newDisplayLineGroup.x + newDisplayLineGroup.width
+if (testing) then
+print ()
+print ("----------------------------")
+print ("A: Render line: "..currentLine)
+print ("currentWidth",currentWidth)
+print ("Render a line (start at margin?)", renderTextFromMargin)
+print ("isFirstLine", isFirstLine)
+print ("   newDisplayLineGroup.y",lineY + baselineAdjustment, baselineAdjustment)
+print ("   newDisplayLineGroup HEIGHT:",newDisplayLineGroup.height)
+print ("x, leftIndent + currentFirstLineIndent + xOffset", x, leftIndent, currentFirstLineIndent, xOffset)
+end
+												-- Adjust Y to the baseline, not top-left corner of the font bounding-box
+												newDisplayLineGroup.y = lineY + baselineAdjustment
+												lineCount = lineCount + 1
+
+												-- Use once, then set to zero.
+												currentFirstLineIndent = 0
+
+												-- Use the current line to estimate how many chars
+												-- we can use to make a line.
+												if (not fontInfo.maxHorizontalAdvance) then
+													minLineCharCount = strlen(currentLine)
+												end
+
+												word = shortword..word
+
+												-- We have wrapped, don't need text from previous chunks of this line.
+												prevTextInLine = ""
+
+												-- If next word is not too big to fit the text column, start the new line with it.
+												-- Otherwise, make a whole new line from it. Not sure how that would help.
+												local wordlen = 0
+												if (textwrapIsCached) then
+													wordlen = cachedChunk.width[cachedChunkLine]
+												else
+													wordlen = strlen(word) * (size * fontInfo.maxCharWidth)
+												end
+
+												-- *** This is needed so right/center justified lines are correctly positioned!!!
+												if (true) then
+													local w
+													if (renderTextFromMargin) then
+														w = currentWidth
+													else
+														w = newDisplayLineGroup.width
+													end
+
+													-- compensate for the stroke
+													local r = display.newRect(0,0,w-2,newDisplayLineGroup.height-2)
+													r:setStrokeColor(0,250,250,0.5)
+													r.strokeWidth=1
+													result:insert(r)
+													r:setReferencePoint(textDisplayReferencePoint)
+													r.x = newDisplayLineGroup.x+1
+													r.y = newDisplayLineGroup.y+1
+													r.isVisible = testing
+													r:setFillColor(0,255,0,0)
+
+													if (renderTextFromMargin) then
+														r:setStrokeColor(0,250,250,0.5)
+													else
+														r:setStrokeColor(0,250,50,0.5)
+													end
+
+													if (lower(tag) == "a") then
+--print ("Yeah, tag = a")
+														local touchme = touchableBox(result, textDisplayReferencePoint, newDisplayLineGroup.x, newDisplayLineGroup.y - (fontInfo.capheight * size)/4,  w-2, fontInfo.capheight * size, hyperlinkFillColor)
+
+														attr.text = currentLine
+														attachLinkToObj(newDisplayLineGroup, attr, handler)
+													end
+
+
+												end
+
+												-- This line has now wrapped around, and the next one should
+												-- start at the margin.
+												renderTextFromMargin = true
+												currentXOffset = 0
+
+												-- Text lines can vary in height depending on whether there are upper case letters, etc.
+												-- Not predictable! So, we capture the height of the first line, and that is the basis of
+												-- our y adjustment for the entire block, to position it correctly.
+												if (not yAdjustment or yAdjustment == 0) then
+													--yAdjustment = (size * fontInfo.ascent )- newDisplayLineGroup.height
+													yAdjustment = ( (size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLineGroup.height
+												end
+
+												if (textwrapIsCached or (wordlen <= currentWidth * widthCorrection) ) then
+
+													if (textwrapIsCached) then
+														currentLine = word
+													else
+														currentLine = word..spacer
+													end
+												else
+													currentLineHeight = lineHeight
+
+													------------------------------------------------------
+													------------------------------------------------------
+													-- B: Render a short line following a wrapped line.
+													------------------------------------------------------
+
+													-- A new line was begun, add to the new line
+													--lineY = lineY + currentLineHeight + currentSpaceBefore
+													lineY = lineY + currentLineHeight
+
+													if (textwrapIsCached) then
+														currentLine = word
+													else
+														cachedChunk.text[cachedChunkLine] = word
+														cachedChunk.width[cachedChunkLine] = wordlen
+													end
+													cachedChunkLine = cachedChunkLine + 1
+
+--print ("B")
+if (testing) then
+print ()
+print ("----------------------------")
+print ("B: render a word: "..word)
+print ("\nrenderTextFromMargin reset to TRUE.")
+print ("isFirstLine", isFirstLine)
+print ("   newDisplayLineGroup.y",lineY + baselineAdjustment, baselineAdjustment)
+print ("   newDisplayLineGroup HEIGHT:",newDisplayLineGroup.height)
+print ("leftIndent + currentFirstLineIndent + xOffset", leftIndent, currentFirstLineIndent, xOffset)
+end
 
 													if (isFirstLine) then
 														currentLineHeight = lineHeight
 														isFirstLine = false
 														currentFirstLineIndent = firstLineIndent
 													else
+														-- If this is the first line of a new paragraph, move to next line
 														currentLineHeight = lineHeight
 														currentFirstLineIndent = 0
-
 													end
-
-													local xOffset = 0
-													-- This new line is at the old line baseline + leading
-													if (renderTextFromMargin) then
-														lineY = lineY + currentLineHeight
-													else
-														xOffset = currentXOffset
-													end
-				--print ("xOffset, currentXOffset",xOffset, currentXOffset)
-
-													if (textwrapIsCached) then
-														currentLine = word
-													else
-														cachedChunk.text[cachedChunkLine] = currentLine
-														cachedChunk.width[cachedChunkLine] = tempLineWidth
-													end
-													cachedChunkLine = cachedChunkLine + 1
 
 													local newDisplayLineGroup = display.newGroup()
 													newDisplayLineGroup.anchorChildren = true
 
-													local newDisplayLineText = display.newText({
-														parent=newDisplayLineGroup,
-														text=currentLine,
-														x=0, y=0,
-														font=font,
-														fontSize = size,
-														align = lower(textAlignment) or "left",
-													})
+													local newDisplayLineText = display.newText(newDisplayLineGroup, word, x, lineY, font, size)
 													newDisplayLineText:setFillColor(unpack(color))
 													newDisplayLineText.alpha = opacity
-
 													result:insert(newDisplayLineGroup)
 													newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
-													if (lower(textAlignment) == "Center") then
-														newDisplayLineGroup.x = floor(currentWidth/2)  + x + leftIndent + currentFirstLineIndent + xOffset
-													elseif (lower(textAlignment) == "right") then
-														newDisplayLineGroup.x = x - xOffset
-													else
-														newDisplayLineGroup.x = x + leftIndent + currentFirstLineIndent + xOffset
-													end
 
-													-- record the width of the current line
-													-- in case we need to add the next
-													-- chunk to the end of it
-													--currentXOffset = newDisplayLineGroup.x + newDisplayLineGroup.width
-if (testing) then
-	print ()
-	print ("----------------------------")
-	print ("A: Render line: "..currentLine)
-	print ("\nRender a line (start at margin?)", renderTextFromMargin)
-	print ("isFirstLine", isFirstLine)
-	print ("   newDisplayLineGroup.y",lineY + baselineAdjustment, baselineAdjustment)
-	print ("   newDisplayLineGroup HEIGHT:",newDisplayLineGroup.height)
-	print ("leftIndent + currentFirstLineIndent + xOffset", leftIndent, currentFirstLineIndent, xOffset)
-end
-													-- Adjust Y to the baseline, not top-left corner of the font bounding-box
+			--print ("textAlignment",textAlignment)
+			--print ("x + leftIndent + currentFirstLineIndent + currentXOffset", x, leftIndent, currentFirstLineIndent, currentXOffset)
+													if (lower(textAlignment) ~= "right") then
+														newDisplayLineGroup.x = x + leftIndent + currentFirstLineIndent + currentXOffset
+													else
+														newDisplayLineGroup.x = x - currentXOffset
+													end
 													newDisplayLineGroup.y = lineY + baselineAdjustment
 													lineCount = lineCount + 1
-
-													-- Use once, then set to zero.
-													currentFirstLineIndent = 0
-
-													-- Use the current line to estimate how many chars
-													-- we can use to make a line.
-													if (not fontInfo.maxHorizontalAdvance) then
-														minLineCharCount = strlen(currentLine)
-													end
-
-													word = shortword..word
-
-													-- We have wrapped, don't need text from previous chunks of this line.
-													prevTextInLine = ""
-
-
-
-
-
-
-													-- If next word is not too big to fit the text column, start the new line with it.
-													-- Otherwise, make a whole new line from it. Not sure how that would help.
-													local wordlen = 0
-													if (textwrapIsCached) then
-														wordlen = cachedChunk.width[cachedChunkLine]
-													else
-														wordlen = strlen(word) * (size * fontInfo.maxCharWidth)
-													end
-
-													-- *** This is needed so right/center justified lines are correctly positioned!!!
-													if (true) then
-														local w
-														if (renderTextFromMargin) then
-															w = currentWidth
-														else
-															w = newDisplayLineGroup.width
-														end
-
-														-- compensate for the stroke
-														local r = display.newRect(0,0,w-2,newDisplayLineGroup.height-2)
-														r:setStrokeColor(0,250,250,0.5)
-														r.strokeWidth=1
-														result:insert(r)
-														r:setReferencePoint(textDisplayReferencePoint)
-														r.x = newDisplayLineGroup.x+1
-														r.y = newDisplayLineGroup.y+1
-														r.isVisible = testing
-														r:setFillColor(0,255,0,0)
-
-														if (renderTextFromMargin) then
-															r:setStrokeColor(0,250,250,0.5)
-														else
-															r:setStrokeColor(0,250,50,0.5)
-														end
-
-														if (lower(tag) == "a") then
---print ("Yeah, tag = a")
-															local touchme = touchableBox(result, textDisplayReferencePoint, newDisplayLineGroup.x, newDisplayLineGroup.y - (fontInfo.capheight * size)/4,  w-2, fontInfo.capheight * size, hyperlinkFillColor)
-
-															attr.text = currentLine
-															attachLinkToObj(newDisplayLineGroup, attr, handler)
-														end
-
-
-													end
-
-													-- This line has now wrapped around, and the next one should
-													-- start at the margin.
-													renderTextFromMargin = true
-													currentXOffset = 0
-
-													-- Text lines can vary in height depending on whether there are upper case letters, etc.
-													-- Not predictable! So, we capture the height of the first line, and that is the basis of
-													-- our y adjustment for the entire block, to position it correctly.
-													if (not yAdjustment or yAdjustment == 0) then
-														--yAdjustment = (size * fontInfo.ascent )- newDisplayLineGroup.height
-														yAdjustment = ( (size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLineGroup.height
-													end
-
-													if (textwrapIsCached or (wordlen <= currentWidth * widthCorrection) ) then
-
-														if (textwrapIsCached) then
-															currentLine = word
-														else
-															currentLine = word..spacer
-														end
-													else
-														currentLineHeight = lineHeight
-
-														------------------------------------------------------
-														------------------------------------------------------
-														-- B: Render a short line following a wrapped line.
-														------------------------------------------------------
-
-														-- A new line was begun, add to the new line
-														--lineY = lineY + currentLineHeight + currentSpaceBefore
-														lineY = lineY + currentLineHeight
-
-														if (textwrapIsCached) then
-															currentLine = word
-														else
-															cachedChunk.text[cachedChunkLine] = word
-															cachedChunk.width[cachedChunkLine] = wordlen
-														end
-														cachedChunkLine = cachedChunkLine + 1
-
---print ("B")
-if (testing) then
-	print ()
-	print ("----------------------------")
-	print ("B: render a word: "..word)
-	print ("\nrenderTextFromMargin reset to TRUE.")
-	print ("isFirstLine", isFirstLine)
-	print ("   newDisplayLineGroup.y",lineY + baselineAdjustment, baselineAdjustment)
-	print ("   newDisplayLineGroup HEIGHT:",newDisplayLineGroup.height)
-	print ("leftIndent + currentFirstLineIndent + xOffset", leftIndent, currentFirstLineIndent, xOffset)
-end
-
-														if (isFirstLine) then
-															currentLineHeight = lineHeight
-															isFirstLine = false
-															currentFirstLineIndent = firstLineIndent
-														else
-															-- If this is the first line of a new paragraph, move to next line
-															currentLineHeight = lineHeight
-															currentFirstLineIndent = 0
-
-														end
-
-														local newDisplayLineGroup = display.newGroup()
-														newDisplayLineGroup.anchorChildren = true
-
-														local newDisplayLineText = display.newText(newDisplayLineGroup, word, x, lineY, font, size)
-														newDisplayLineText:setFillColor(unpack(color))
-														newDisplayLineText.alpha = opacity
-														result:insert(newDisplayLineGroup)
-														newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
-
-				--print ("textAlignment",textAlignment)
-				--print ("x + leftIndent + currentFirstLineIndent + currentXOffset", x, leftIndent, currentFirstLineIndent, currentXOffset)
-														if (lower(textAlignment) ~= "right") then
-															newDisplayLineGroup.x = x + leftIndent + currentFirstLineIndent + currentXOffset
-														else
-															newDisplayLineGroup.x = x - currentXOffset
-														end
-														newDisplayLineGroup.y = lineY + baselineAdjustment
-														lineCount = lineCount + 1
-														currentLine = ''
+													currentLine = ''
 
 --														if (isFirstLine) then
 --															currentLineHeight = 0
@@ -1631,225 +1622,218 @@ end
 --														end
 --
 --
-														if (lower(tag) == "a") then
-															w = newDisplayLineGroup.width
+													if (lower(tag) == "a") then
+														w = newDisplayLineGroup.width
 --print ("Yeah, tag = a")
-															local touchme = touchableBox(result, textDisplayReferencePoint, newDisplayLineGroup.x, newDisplayLineGroup.y - (fontInfo.capheight * size)/4,  w-2, fontInfo.capheight * size, hyperlinkFillColor)
+														local touchme = touchableBox(result, textDisplayReferencePoint, newDisplayLineGroup.x, newDisplayLineGroup.y - (fontInfo.capheight * size)/4,  w-2, fontInfo.capheight * size, hyperlinkFillColor)
 
-															attr.text = currentLine
-															attachLinkToObj(newDisplayLineGroup, attr, handler)
-														end
-
-
-
-													end	-- end B
-
-
-
-
-													-- Get min characters to start with
-													-- We now know the max char width in a font,
-													-- so we can start with a minimum based on that.
-													-- IF the metric was set!
-													if (not textwrapIsCached and not fontInfo.maxHorizontalAdvance) then
-														-- Get stats for next line
-														-- Set the new min char count to the current line length, minus a few for protection
-														-- (20 is chosen from a few tests)
-														minLineCharCount = max(minLineCharCount - 20,1)
+														attr.text = currentLine
+														attachLinkToObj(newDisplayLineGroup, attr, handler)
 													end
 
+
+
+												end	-- end B
+
+
+
+
+												-- Get min characters to start with
+												-- We now know the max char width in a font,
+												-- so we can start with a minimum based on that.
+												-- IF the metric was set!
+												if (not textwrapIsCached and not fontInfo.maxHorizontalAdvance) then
+													-- Get stats for next line
+													-- Set the new min char count to the current line length, minus a few for protection
+													-- (20 is chosen from a few tests)
+													minLineCharCount = max(minLineCharCount - 20,1)
 												end
-											end
 
-											if (not textwrapIsCached) then
-												display.remove(tempDisplayLine);
-												tempDisplayLine=nil;
 											end
-
-											shortword = ""
 										end
 
-									else
-										currentLine = tempLine
+										if (not textwrapIsCached) then
+											display.remove(tempDisplayLine);
+											tempDisplayLine=nil;
+										end
+
+										shortword = ""
 									end
-								end
 
-								---------------------------------------------
-								-- end for
-								---------------------------------------------
-
-
-
-
-								-- Allow for lines with beginning spaces, for positioning
-								if (usePeriodsForLineBeginnings and substring(currentLine,1,1) == ".") then
-									currentLine = substring(currentLine,2,-1)
-								end
-
-								-- C: line render
-								-------- C: SHORT LINE or FINAL LINE OF PARAGRAPH
-								-- Add final line that didn't need wrapping
-								-- Add a space to deal with a weirdo bug that was deleting final words. ????
-
-if (testing) then
-	print ()
-	print ("----------------------------")
-	print ("C: Final line: ["..currentLine.."]", strlen(currentLine))
-	print ("isFirstLine", isFirstLine)
-end
-								if (isFirstLine) then
-									currentLineHeight = lineHeight
-									isFirstLine = false
-									lineY = lineY + lineHeight + currentSpaceBefore
-									currentFirstLineIndent = firstLineIndent
 								else
-									-- If this is the first line of a new paragraph, move to next line
-									currentLineHeight = lineHeight
-
-									if (renderTextFromMargin) then
-										currentXOffset = 0
-										lineY = lineY + currentLineHeight + currentSpaceBefore
-									end
-									currentFirstLineIndent = 0
+									currentLine = tempLine
 								end
+							end
 
-								if (not textwrapIsCached) then
-									cachedChunk.text[cachedChunkLine] = currentLine
-									cachedChunk.width[cachedChunkLine] = currentWidth
+							---------------------------------------------
+							-- end for
+							---------------------------------------------
+
+
+
+
+							-- Allow for lines with beginning spaces, for positioning
+							if (usePeriodsForLineBeginnings and substring(currentLine,1,1) == ".") then
+								currentLine = substring(currentLine,2,-1)
+							end
+
+							-- C: line render
+							-------- C: SHORT LINE or FINAL LINE OF PARAGRAPH
+							-- Add final line that didn't need wrapping
+							-- Add a space to deal with a weirdo bug that was deleting final words. ????
+
+if (testing) then
+print ()
+print ("----------------------------")
+print ("C: Final line: ["..currentLine.."]", strlen(currentLine))
+print ("isFirstLine", isFirstLine)
+print ("X=",x)
+end
+							if (isFirstLine) then
+								currentLineHeight = lineHeight
+								isFirstLine = false
+								lineY = lineY + lineHeight + currentSpaceBefore
+								currentFirstLineIndent = firstLineIndent
+							else
+								-- If this is the first line of a new paragraph, move to next line
+								currentLineHeight = lineHeight
+								if (renderTextFromMargin) then
+									currentXOffset = 0
+									lineY = lineY + currentLineHeight
 								end
-								cachedChunkLine = cachedChunkLine + 1
+								currentFirstLineIndent = 0
+							end
+
+							if (not textwrapIsCached) then
+								cachedChunk.text[cachedChunkLine] = currentLine
+								cachedChunk.width[cachedChunkLine] = currentWidth
+							end
+							cachedChunkLine = cachedChunkLine + 1
 
 
 if (testing) then
-	print ("Start at margin)", renderTextFromMargin)
-	print ("Previous Line:", "["..prevTextInLine.."]", strlen(prevTextInLine))
-	print ("lineY:",lineY)
-	print ("currentSpaceBefore:",currentSpaceBefore)
-	if (currentSpaceBefore > 0) then
-		print ("************")
-	end
+print ("Start at margin)", renderTextFromMargin)
+print ("Previous Line:", "["..prevTextInLine.."]", strlen(prevTextInLine))
+print ("lineY:",lineY)
+print ("currentSpaceBefore:",currentSpaceBefore)
+print ("X=",x)
+if (currentSpaceBefore > 0) then
+	print ("************")
 end
-								-- IF content remains, render it.
-								-- It is possible get the tailing space of block
-								if (strlen(currentLine) > 0) then
+end
+							-- IF content remains, render it.
+							-- It is possible get the tailing space of block
+							if (strlen(currentLine) > 0) then
 
 --print ("C: render a line:", currentLine)
 
-									local newDisplayLineGroup = display.newGroup()
-									newDisplayLineGroup.anchorChildren = true
+								local newDisplayLineGroup = display.newGroup()
+								newDisplayLineGroup.anchorChildren = true
 
-									local newDisplayLineText = display.newText({
-										parent = newDisplayLineGroup,
-										text = currentLine,
-										x = 0, y = 0,
-										font = font,
-										fontSize = size,
-										align = lower(textAlignment) or "left",
-									})
-									newDisplayLineText.alpha = opacity
-									newDisplayLineText:setFillColor(unpack(color))
+								local newDisplayLineText = display.newText({
+									parent = newDisplayLineGroup,
+									text = currentLine,
+									x = 0, y = 0,
+									font = font,
+									fontSize = size,
+									align = lower(textAlignment) or "left",
+								})
+								newDisplayLineText.alpha = opacity
+								newDisplayLineText:setFillColor(unpack(color))
 
-									result:insert(newDisplayLineGroup)
+								result:insert(newDisplayLineGroup)
 
-									-- GRAPHICS 2.0: text now is always centered around its x,y
-									-- so we must move it.
-									newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
-									newDisplayLineGroup.x, newDisplayLineGroup.y = x, lineY
+								-- GRAPHICS 2.0: text now is always centered around its x,y
+								-- so we must move it.
+								newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
+								newDisplayLineGroup.x, newDisplayLineGroup.y = x, lineY
 
 
-									local ta = lower(textAlignment)
+								local ta = lower(textAlignment)
 --print ("Warning: textwrap has alignment to the left for everything in C section.")
 --ta = "left"
 
-									if (ta == "right") then
-										newDisplayLineGroup.x = x + currentXOffset
-										currentXOffset = newDisplayLineGroup.x - newDisplayLineGroup.width
+								if (ta == "right") then
+									newDisplayLineGroup.x = x + currentXOffset
+									currentXOffset = newDisplayLineGroup.x - newDisplayLineGroup.width
 
-										newDisplayLineGroup:setReferencePoint(display["BottomRightReferencePoint"])
-									elseif (ta == "center") then
-										-- position from left because there is a rect giving us 0,0 positioning
-										newDisplayLineGroup:setReferencePoint(display["BottomLeftReferencePoint"])
-										newDisplayLineGroup.x = x + leftIndent + currentXOffset
-										--newDisplayLineGroup.x = floor(currentWidth/2) + leftIndent + firstLineIndent
+									newDisplayLineGroup:setReferencePoint(display["BottomRightReferencePoint"])
+								elseif (ta == "center") then
+									-- position from left because there is a rect giving us 0,0 positioning
+									newDisplayLineGroup:setReferencePoint(display["BottomLeftReferencePoint"])
+									newDisplayLineGroup.x = x + leftIndent + currentXOffset
+									--newDisplayLineGroup.x = floor(currentWidth/2) + leftIndent + firstLineIndent
 
-										currentXOffset = newDisplayLineGroup.x + newDisplayLineGroup.width
-									else
-										-- LEFT:
-										newDisplayLineGroup:setReferencePoint(display["BottomLeftReferencePoint"])
-										newDisplayLineGroup.x = x + leftIndent + currentFirstLineIndent + currentXOffset
-										currentXOffset = newDisplayLineGroup.x + newDisplayLineGroup.width
-									end
-									newDisplayLineGroup.y = lineY + baselineAdjustment
+									currentXOffset = newDisplayLineGroup.x + newDisplayLineGroup.width
+								else
+									-- LEFT:
+									newDisplayLineGroup:setReferencePoint(display["BottomLeftReferencePoint"])
+									newDisplayLineGroup.x = x + leftIndent + currentFirstLineIndent + currentXOffset
+									currentXOffset = newDisplayLineGroup.x + newDisplayLineGroup.width
+								end
+								newDisplayLineGroup.y = lineY + baselineAdjustment
 
 if (testing) then
-	print ("   newDisplayLineGroup.y: ",lineY + baselineAdjustment)
-	print ("   newDisplayLineGroup HEIGHT:",newDisplayLineGroup.height)
-	print ("  ")
+print ("   newDisplayLineGroup.y: ",lineY + baselineAdjustment)
+print ("   newDisplayLineGroup HEIGHT:",newDisplayLineGroup.height)
+print ("  ")
 
-	--newDisplayLineText:setFillColor(0,250,100,1.0)
+--newDisplayLineText:setFillColor(0,250,100,1.0)
 end
-									-- Save the current line if we started at the margin
-									-- So the next line, if it has to, can start where this one ends.
-									prevTextInLine = prevTextInLine .. currentLine
+								-- Save the current line if we started at the margin
+								-- So the next line, if it has to, can start where this one ends.
+								prevTextInLine = prevTextInLine .. currentLine
 
-									-- Since line heights are not predictable, we capture the yAdjustment based on
-									-- the actual height the first rendered line of text
-									if (not yAdjustment or yAdjustment == 0) then
-										--yAdjustment = (size * fontInfo.ascent )- newDisplayLineGroup.height
-										yAdjustment = ( (size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLineGroup.height
+								-- Since line heights are not predictable, we capture the yAdjustment based on
+								-- the actual height the first rendered line of text
+								if (not yAdjustment or yAdjustment == 0) then
+									--yAdjustment = (size * fontInfo.ascent )- newDisplayLineGroup.height
+									yAdjustment = ( (size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLineGroup.height
+								end
+
+								-- NOT working for right/centered styled text!
+								-- *** This is needed so right/center justified lines are correctly positioned!!!
+								if (true) then
+									local w
+									if (renderTextFromMargin) then
+										w = currentWidth
+									else
+										w = currentWidth - newDisplayLineGroup.width
 									end
 
-									-- NOT working for right/centered styled text!
-									-- *** This is needed so right/center justified lines are correctly positioned!!!
-									if (true) then
-										local w
-										if (renderTextFromMargin) then
-											w = currentWidth
-										else
-											w = currentWidth - newDisplayLineGroup.width
-										end
-
-										if (ta == "left") then
-											w = newDisplayLineGroup.width
-										end
-
-										-- compensate for the stroke
-										local r = display.newRect(0,0,w-2,newDisplayLineGroup.height-2)
-										r:setStrokeColor(150,0,0,125)
-										r.strokeWidth=1
-										result:insert(r)
-
-										r:setReferencePoint(textDisplayReferencePoint)
-										r.x = newDisplayLineGroup.x+1
-										r.y = newDisplayLineGroup.y+1
-										r.isVisible = testing
-										r:setFillColor(0,1,0,0) -- transparent
-
-										if (lower(tag) == "a") then
-											local touchme = touchableBox(result, textDisplayReferencePoint, newDisplayLineGroup.x, newDisplayLineGroup.y - (fontInfo.capheight * size)/4,  w-2, fontInfo.capheight * size, hyperlinkFillColor)
-											attr.text = currentLine
-											attachLinkToObj(touchme, attr, handler)
-										end
-
+									if (ta == "left") then
+										w = newDisplayLineGroup.width
 									end
 
-									-- Clear the current line
-									currentLine = ""
+									-- compensate for the stroke
+									local r = display.newRect(0,0,w-2,newDisplayLineGroup.height-2)
+									r:setStrokeColor(150,0,0,125)
+									r.strokeWidth=1
+									result:insert(r)
+
+									r:setReferencePoint(textDisplayReferencePoint)
+									r.x = newDisplayLineGroup.x+1
+									r.y = newDisplayLineGroup.y+1
+									r.isVisible = testing
+									r:setFillColor(0,1,0,0) -- transparent
+
+									if (lower(tag) == "a") then
+										local touchme = touchableBox(result, textDisplayReferencePoint, newDisplayLineGroup.x, newDisplayLineGroup.y - (fontInfo.capheight * size)/4,  w-2, fontInfo.capheight * size, hyperlinkFillColor)
+										attr.text = currentLine
+										attachLinkToObj(touchme, attr, handler)
+									end
 
 								end
 
-								cache[cacheChunkCtr] = cachedChunk
-								cacheChunkCtr = cacheChunkCtr + 1
-								return result
+								-- Clear the current line
+								currentLine = ""
+
 							end
 
-							------------------------------------------------------------
-							-- end renderChunk
-							------------------------------------------------------------
+							cache[cacheChunkCtr] = cachedChunk
+							cacheChunkCtr = cacheChunkCtr + 1
+							return result
 
-
-							local chunk = renderChunk( tag )
-							return chunk
 						end -- renderParsedElement()
 
 					-- save the style settings as they are before
@@ -1867,9 +1851,14 @@ end
 
 					if (tag == "p" or tag == "div" or tag == "li" or tag == "ul" or tag == "ol") then
 
-						-- Apply style settings
+						-- Reset margins, cursor, etc. to defaults
 						renderTextFromMargin = true
 						currentXOffset = 0
+						x = 0
+						leftIndent = 0
+						rightIndent = 0
+						
+						-- Apply style settings
 						local styleName = "MISSING"
 						if (attr.class) then
 							styleName = lower(attr.class)
@@ -1946,7 +1935,8 @@ end
 
 
 					--endOfLine = false
-
+					
+												
 					for n, element in ipairs(parsedText) do
 						--local styleSettings = {}
 						if (type(element) == "table") then

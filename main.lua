@@ -46,7 +46,7 @@ local midscreenX = screenW*(0.5)
 local midscreenY = screenH*(0.5)
 
 local w = screenW/2
-
+w = 400
 
 local textStyles = funx.loadTextStyles("textstyles.txt", system.ResourceDirectory)
 
@@ -60,7 +60,7 @@ if (true) then
 end
 
 -- To prevent caching, set the cache dir to empty
---cacheDir = ""
+cacheDir = ""
 
 local params = {
 	text = mytext,

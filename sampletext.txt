@@ -1,4 +1,4 @@
-<p>One of the most distinguishing features of this species is the bold dark-bars draped across the dorsal surface. Additional dark spots are found along the lateral surfaces of the species. In adult specimens, the pectoral fins are broadly triangular.</p>
-<p>One of the most distinguishing features of this species is the bold dark-bars draped across the dorsal surface. Additional dark spots are found along the lateral surfaces of the species. In adult specimens, the pectoral fins are broadly triangular.</p>
-<p>Yes, I like fish.</p>
+<p class="right">One of the most distinguishing features of this species is the bold dark-bars draped across the dorsal surface. Additional dark spots are found along the lateral surfaces of the species. In adultspecimens.</p>
+<p class="right">Yes, I like fish.</p>
+<p class="normal">One of the most distinguishing features of this species is the bold dark-bars draped across the dorsal surface. Additional dark spots are found along the lateral surfaces of the species. In adultspecimens.</p>
 <p>They re cool.</p>
