@@ -431,7 +431,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 		defaultStyle = text.defaultStyle or ""
 		cacheDir = text.cacheDir
 		settings.handler = text.handler
-		hyperlinkFillColor = text.hyperlinkFillColor or "0,0,255,0"
+		hyperlinkFillColor = text.hyperlinkFillColor or "0,0,255,"..TRANSPARENT
 
 		-- restore text
 		text = text.text
@@ -546,7 +546,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 --	size = tonumber(size) or 12
 --	color = color or {0,0,0,0}
 --	width = funx.percentOfScreenWidth(width) or display.contentWidth
---	opacity = funx.applyPercent(opacity, 1) or 1
+--	opacity = funx.applyPercent(opacity, OPAQUE) or OPAQUE
 --	targetDeviceScreenSize = targetDeviceScreenSize or screenW..","..screenH
 	-- case can be ALL_CAPS or NORMAL
 	--local case = "NORMAL";
@@ -564,7 +564,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	settings.size = tonumber(size) or 12
 	settings.color = color or {0,0,0,0}
 	settings.width = funx.percentOfScreenWidth(width) or display.contentWidth
-	settings.opacity = funx.applyPercent(opacity, 1) or 1
+	settings.opacity = funx.applyPercent(opacity, OPAQUE) or OPAQUE
 	settings.targetDeviceScreenSize = targetDeviceScreenSize or screenW..","..screenH
 	settings.case = "NORMAL"
 	settings.spaceBefore = 0
@@ -586,7 +586,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	-- LINE IS OTHERWISE, THIS WILL FAIL. FUCK.
 	--local r = display.newRect(0,0,width,10)
 	local r = display.newRect(0,0,5,5)
-	r:setFillColor(255,0,0,255)
+	r:setFillColor(255,0,0,OPAQUE)
 	result:insert(r)
 	result._positionRect = r
 	r.strokeWidth=0
@@ -709,7 +709,14 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				--lineHeight = scaleToScreenSize(tonumber(params[4]), scalingRatio)
 			end
 			-- color
-			if ((params[5] and params[5] ~= "") and (params[6] and params[6] ~= "") and (params[7] and params[7] ~= "")) then settings.color = {tonumber(params[5]), tonumber(params[6]), tonumber(params[7])} end
+			if ((params[5] and params[5] ~= "") and (params[6] and params[6] ~= "") and (params[7] and params[7] ~= "")) then 
+				-- Handle opacity as RGBa or HDRa, not by itself
+				if (params[9] and params[9] ~= "") then 
+					settings.color = {tonumber(params[5]), tonumber(params[6]), tonumber(params[7]), funx.applyPercent(params[9], OPAQUE) }
+				else
+					settings.color = {tonumber(params[5]), tonumber(params[6]), tonumber(params[7], OPAQUE) }
+				end
+			end
 			-- width of the text block
 			if (params[8] and params[8] ~= "") then
 				if (params[8] == "reset" or params[8] == "r") then
@@ -719,8 +726,9 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				end
 				settings.minLineCharCount = minCharCount or 5
 			end
-			-- opacity
-			if (params[9] and params[9] ~= "") then settings.opacity = funx.applyPercent(params[9], OPAQUE) end
+			-- opacity (Now always 100%)
+			--if (params[9] and params[9] ~= "") then settings.opacity = funx.applyPercent(params[9], OPAQUE) end
+			settings.opacity = 1.0
 			-- case (upper/normal)
 			if (params[10] and params[10] ~= "") then settings.case = funx.trim(params[10]) end
 
@@ -814,7 +822,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			end
 
 			-- opacity
-			if (format.opacity) then settings.opacity = funx.applyPercent(format.opacity, OPAQUE) end
+			-- Now built into the color, e.g. RGBa color
+			--if (format.opacity) then settings.opacity = funx.applyPercent(format.opacity, OPAQUE) end
 
 			-- case (upper/normal) using legacy coding ("case")
 			if (format.case) then
@@ -1319,7 +1328,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 							-- and have the text actually go there.
 							local resultPosRect = display.newRect(result,0,0,1,1)
 							resultPosRect.anchorX, resultPosRect.anchorY = 0,0
-							resultPosRect:setFillColor(1,0,0, 1)
+							resultPosRect:setFillColor(1,0,0, OPAQUE)
 							resultPosRect.isVisible = false
 
 
@@ -1457,9 +1466,8 @@ A: Render text that fills the entire line
 													fontSize = settings.size,
 													align = lower(textAlignment) or "left",
 												})
-print ("COLOR")
-												newDisplayLineText:setFillColor(unpack(color))
-												newDisplayLineText.alpha = settings.opacity
+												newDisplayLineText:setFillColor(unpack(settings.color))
+												--newDisplayLineText.alpha = settings.opacity
 
 												result:insert(newDisplayLineGroup)
 												newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
@@ -1533,7 +1541,7 @@ end
 													r.x = newDisplayLineGroup.x+1
 													r.y = newDisplayLineGroup.y+1
 													r.isVisible = testing
-													r:setFillColor(0,255,0,0)
+													r:setFillColor(0,255,0,TRANSPARENT)
 
 													if (renderTextFromMargin) then
 														r:setStrokeColor(0,250,250,0.5)
@@ -1618,8 +1626,9 @@ end
 													newDisplayLineGroup.anchorChildren = true
 
 													local newDisplayLineText = display.newText(newDisplayLineGroup, word, x, lineY, settings.font, settings.size)
-													newDisplayLineText:setFillColor(unpack(color))
-													newDisplayLineText.alpha = settings.opacity
+													newDisplayLineText:setFillColor(unpack(settings.color))
+													--newDisplayLineText.alpha = settings.opacity
+													newDisplayLineText.alpha = 1
 													result:insert(newDisplayLineGroup)
 													newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
 
@@ -1763,8 +1772,9 @@ end
 									fontSize = settings.size,
 									align = lower(textAlignment) or "left",
 								})
-								newDisplayLineText.alpha = settings.opacity
-								newDisplayLineText:setFillColor(unpack(color))
+								--newDisplayLineText.alpha = settings.opacity
+								newDisplayLineText.alpha = 1
+								newDisplayLineText:setFillColor(unpack(settings.color))
 
 								result:insert(newDisplayLineGroup)
 
@@ -2029,7 +2039,7 @@ end
 --						elementCounter = 1
 					end
 
-					--print ("Restore style settings", color[1], tag)
+					--print ("Restore style settings", settings.color[1], tag)
 					-- Restore style settings to what they were before
 					-- entering the tag
 

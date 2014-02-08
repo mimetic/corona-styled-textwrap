@@ -165,25 +165,32 @@ local Display, Native
 -- translates RGB color sequence to equivalent HDR values
 --
 function translateRGBToHDR( ... )
-	-- print( 'translateRGBToHDR' )
+print( 'translateRGBToHDR' )
 
 	local args = { ... }
 	local color
 
-	-- print(  args[1], args[2], args[3], args[4], args[5] )
+print(  args[2], args[3], args[4], "alpha ",args[5] )
 
 	if type( args[2] ) == 'number' then
 		-- regular RGB
-		color = { args[2]/255, args[3]/255, args[4]/255, args[5] }
+		if args[3] == nil then 
+			args[3] = args[2]
+			args[4] = args[2]
+		end
+		if args[4] == nil then args[4] = args[2] end
+		if args[5] == nil then args[5] = 1 end
+print(  args[2], args[3], args[4], "alpha ",args[5] )
+		color = { args[2]/255, args[3]/255, args[4]/255, args[5]/255 }
 
 	elseif type( args[2] ) == 'table' and args[2].type=='gradient' then
 
 		-- gradient RGB
 		t = args[2].color1
-		args[2].color1 = { t[1]/255, t[2]/255, t[3]/255, t[4] }
+		args[2].color1 = { t[1]/255, t[2]/255, t[3]/255, (t[4] or 255)/255 }
 
 		t = args[2].color2
-		args[2].color2 = { t[1]/255, t[2]/255, t[3]/255, t[4] }
+		args[2].color2 = { t[1]/255, t[2]/255, t[3]/255, (t[4] or 255)/255 }
 
 		color = { args[2] }
 
@@ -205,7 +212,7 @@ function translateRGBToHDR( ... )
 		print('\n')
 	end
 
-	-- print( color[1], color[2], color[3], color[4] )
+	--print( "Result", color[1], color[2], color[3], color[4] )
 
 	return color
 end
@@ -505,7 +512,7 @@ function Display.newText( ... )
 		addSetAnchor( o, Display.CenterReferencePoint )
 	end
 	if dkd.activate_fillcolor then
-		addSetFillColor( o, 'setTextColor' )
+		addSetFillColor( o, 'setFillColor' )
 	end
 
 	return o
