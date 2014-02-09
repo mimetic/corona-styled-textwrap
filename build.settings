@@ -2,10 +2,10 @@ settings =
 {
 	orientation =
 	{
-		default = "landscapeLeft",
+		default = "portraitLeft",
 		supported =
 		{
-			"landscapeLeft", "landscapeRight"
+			"landscapeLeft", "landscapeRight", "portraitLeft", "portraitRight",
 		},
 	},
 

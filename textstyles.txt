@@ -1,4 +1,6 @@
 # style = font, size, leading, R,G,B, width, opacity, NORMAL|ALL_CAPS, text alignment, spaceBefore, spaceAfter, firstLineIndent, leftIndent, rightIndent
-Normal = Avenir,16,20, 255,0,0,,50%,NORMAL,left,,10,,40,50
+Normal = Baskerville,16,20, 0,150,0,,50%,NORMAL, left,,10,20,40,50
 Right = Avenir,16,20,0,0,0,,100%,NORMAL,right,40,5,,20,20
 Center = Avenir,16,20,0,0,0,,100%,NORMAL,center,,,,40,20
+
+Heading 1 = Avenir,28,32, 0,0,0,,100%,NORMAL,left,,,,,

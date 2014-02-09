@@ -304,6 +304,7 @@ end
 
 -- if we have file with named colors then process it
 --
+print ("dmc_kolor_data.named_color_file",dmc_kolor_data.named_color_file)
 if dmc_kolor_data.named_color_file and dmc_kolor_data.named_color_format then
 	readInNamedColors( dmc_kolor_data.named_color_file, dmc_kolor_data.named_color_format )
 end
@@ -317,9 +318,14 @@ function translateRGBToHDR( ... )
 	local color
 
 	if type( args[2] ) == 'number' then
-
 		-- regular RGB
-		color = { args[2]/255, args[3]/255, args[4]/255, args[5] }
+		if args[3] == nil then 
+			args[3] = args[2]
+			args[4] = args[2]
+		end
+		if args[4] == nil then args[4] = args[2] end
+		if args[5] == nil then args[5] = 255 end
+		color = { args[2]/255, args[3]/255, args[4]/255, args[5]/255 }
 
 	elseif type( args[2] ) == 'table' and args[2].type=='gradient' then
 

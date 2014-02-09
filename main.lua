@@ -25,8 +25,8 @@
 --]]
 
 -- Patches to allow Graphics 1.0 calls while using Graphics 2.0
-require( 'dmc_kompatible' )
---require( 'scripts.dmc.dmc_kolor.dmc_kolor' )
+require( 'scripts.dmc.dmc_kompatible' )
+--require( 'scripts.dmc.dmc_kolor' )
 --require ( 'scripts.patches.refPointConversions' )
 
 -- Default anchor settings
@@ -82,14 +82,6 @@ local params = {
 	isHTML = true,
 }
 
--- Page background
-local bkgd = display.newRect(0,0,screenW, screenH)
-bkgd:setFillColor(255,255,255,255)
-bkgd:setReferencePoint(display.TopLeftReferencePoint)
-bkgd.x = 0
-bkgd.y = 0
-
-
 ------------
 -- Speed tests, cache vs. no cache
 
@@ -135,17 +127,25 @@ tout.y = 30
 
 local t = textwrap.autoWrappedText(params)
 t:setReferencePoint(display.TopLeftReferencePoint)
-t.x = 350
-t.y = 100
-
+t.x = 20
+t.y = 20
 
 
 -- Frame the text
-local textframe = display.newRect(0,0, w, t.height)
-textframe:setFillColor(100,100,0,0) -- transparent
+local textframe = display.newRect(0,0, w+2, t.height + 2)
+textframe:setFillColor(100,100,0,20) -- transparent
 textframe:setStrokeColor(0,0,0,255)
-textframe.strokeWidth = 1
+textframe.strokeWidth = 3
 textframe:setReferencePoint(display.TopLeftReferencePoint)
-textframe.x = t.x
-textframe.y = t.y
+textframe.x = t.x - 1
+textframe.y = t.y - 1
+textframe:toBack()
 
+
+-- Page background
+local bkgd = display.newRect(0,0,screenW, screenH)
+bkgd:setFillColor(255,255,255,255)
+bkgd:setReferencePoint(display.TopLeftReferencePoint)
+bkgd.x = 0
+bkgd.y = 0
+bkgd:toBack()

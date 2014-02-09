@@ -36,7 +36,6 @@ DEALINGS IN THE SOFTWARE.
 local VERSION = "1.0.0"
 
 
-print("LOAIDNG BOOT")
 --====================================================================--
 -- Setup Support Methods
 --====================================================================--
@@ -236,20 +235,21 @@ if _G.__dmc_library == nil then
 		dmc_lib_info.location = string.gsub( dmc_lib_info.location, '[/\\]', "." )
 	end
 
-	-- setup find() utility
-	dmc_lib_data.func = {}
-	dmc_lib_data.func.find = function( name )
-		local loc = ''
-		if dmc_lib_data[name] and dmc_lib_data[name].location then
-			loc = dmc_lib_data[name].location
-		else
-			loc = dmc_lib_info.location
-		end
-		if loc ~= '' and string.sub( loc, -1 ) ~= '.' then
-			loc = loc .. '.'
-		end
-		return loc .. name
+-- setup find() utility
+dmc_lib_data.func = {}
+dmc_lib_data.func.find = function( name )
+	local loc = ''
+	if dmc_lib_data[name] and dmc_lib_data[name].location then
+		loc = dmc_lib_data[name].location
+	else
+		loc = dmc_lib_info.location
 	end
+	if loc ~= '' and string.sub( loc, -1 ) ~= '.' then
+		loc = loc .. '.'
+	end
+	return loc .. name
+end
+
 
 end
 
