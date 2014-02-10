@@ -35,7 +35,7 @@
 
 
 -- TESTING
-local testing = true
+local testing = false
 
 
 -- Main var for this module
@@ -1299,7 +1299,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 
 								r.isVisible = testing
 
-								if (lower(tag) == "a") then
+								if (tag == "a") then
 									local touchme = touchableBox(result, textDisplayReferencePoint, newDisplayLineGroup.x, newDisplayLineGroup.y - (fontInfo.capheight * settings.size)/4,  newDisplayLineText.width-2, fontInfo.capheight * settings.size, hyperlinkFillColor)
 
 									attr.text = alttext
@@ -1308,15 +1308,31 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 							end
 
 
-
-							-- Align the text on the row
-							local function positionNewDisplayLineX(newDisplayLineGroup)
+							-- Trim the text for the line depending on alignment
+							-- Note, for right-to-left languages, you'd have to change the trimming.
+							local function trimByAlignment(t)
 								local ta = lower(textAlignment)
 
 								if (ta == "center") then
-									newDisplayLineGroup.x = x + settings.currentLeftIndent + xOffset
+									t = funx.trim(t)
 								elseif (ta == "right") then
-									newDisplayLineGroup.x = x - xOffset
+									t = funx.rtrim(t)
+								else
+									--t = funx.rtrim(t)
+								end
+								return t
+							end
+
+
+
+							-- Align the text on the row
+							local function positionNewDisplayLineX(newDisplayLineGroup, w)
+								local ta = lower(textAlignment)
+
+								if (ta == "center") then
+									newDisplayLineGroup.x = x + settings.currentLeftIndent + xOffset + currentWidth/2
+								elseif (ta == "right") then
+									newDisplayLineGroup.x = currentWidth + x + settings.currentLeftIndent + settings.currentFirstLineIndent + xOffset
 								else
 									newDisplayLineGroup.x = x + settings.currentLeftIndent + settings.currentFirstLineIndent + xOffset
 								end
@@ -1334,7 +1350,6 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 								else
 									currentXOffset = currentXOffset + settings.currentLeftIndent + settings.currentFirstLineIndent + newDisplayLineText.width
 								end
-								print ( "setCurrentXOffset set currentXOffset to "..currentXOffset)
 							end
 
 
@@ -1358,7 +1373,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 
 
 							-- Set the current width of the column, factoring in indents
-							currentWidth = settings.width - settings.leftIndent - settings.rightIndent - settings.currentFirstLineIndent
+							--currentWidth = settings.width - settings.leftIndent - settings.rightIndent - settings.currentFirstLineIndent
 
 
 							------------------------------------------------
@@ -1459,8 +1474,8 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 
 									else
 										if (not textwrapIsCached) then
-											-- Draw the text as a line.
-											tempDisplayLineTxt = display.newText(tempLine, x, 0, settings.font, settings.size)
+											-- Draw the text as a line.								-- Trim based on alignment!
+											tempDisplayLineTxt = display.newText(trimByAlignment(tempLine), x, 0, settings.font, settings.size)
 											tempDisplayLineTxt:setReferencePoint(display.TopLeftReferencePoint)
 											tempDisplayLineTxt.x = 0
 											tempDisplayLineTxt.y = 0
@@ -1488,7 +1503,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 										currentWidth = settings.width - settings.leftIndent - settings.rightIndent - settings.currentFirstLineIndent
 
 										if (tempLineWidth <= currentWidth * widthCorrection )  then
-											currentLine = tempLine
+											currentLine = trimByAlignment(tempLine)
 										else
 											if ( settings.maxHeight==0 or (lineY <= settings.maxHeight - currentLineHeight)) then
 
@@ -1567,8 +1582,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 													-- Adjust Y to the baseline, not top-left corner of the font bounding-box
 													newDisplayLineGroup.y = lineY + baselineAdjustment
 
-													positionNewDisplayLineX(newDisplayLineGroup)
-print ("A: xOffset", xOffset)
+													positionNewDisplayLineX(newDisplayLineGroup, newDisplayLineText.width)
 
 
 													lineCount = lineCount + 1
@@ -1900,13 +1914,14 @@ end
 					local styleSettings = getAllStyleSettings()
 
 					tag, attr = convertHeaders(tag, attr)
+					tag = lower(tag)
 
 					local listIdentDistance = 20
 
 					------------------------------------------------------------
 					-- Handle formatting tags: p, div, br
 					------------------------------------------------------------
-
+					
 					if (tag == "p" or tag == "div" or tag == "li" or tag == "ul" or tag == "ol") then
 
 						-- Reset margins, cursor, etc. to defaults
@@ -1915,13 +1930,17 @@ end
 						x = 0
 						settings.leftIndent = 0
 						settings.rightIndent = 0
-
-						-- Apply style settings
-						local styleName = "MISSING"
+						
+						-- Apply style based on tag, e.g. <ol> or <p>
+						if (textstyles and textstyles[tag] ) then
+							local params = textstyles[tag]
+							setStyleFromCommandLine (params)
+						end
+						
+						-- Next, apply style settings
+						local styleName = "Normal"
 						if (attr.class) then
 							styleName = lower(attr.class)
-						end
-						if (attr.class) then
 							if (textstyles and textstyles[styleName] ) then
 								local params = textstyles[styleName]
 								setStyleFromCommandLine (params)
