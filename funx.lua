@@ -484,6 +484,50 @@ function trim(s, returnNil)
 end
 
 
+--------------------------------------------------------
+-- ltrim
+-- Remove white space from the start of a string, OR table of strings recursively
+-- Only act on strings
+-- If flag set, return nil for an empty string
+function ltrim(s, returnNil)
+	if (s) then
+		if (type(s) == "table") then
+			for i,v in ipairs(s) do
+				s[i] = ltrim(v, returnNil)
+			end
+		elseif (type(s) == "string") then
+			s = s:gsub("^%s*(.-)", "%1")
+		end
+	end
+	if (returnNil and s == "") then
+		return nil
+	end
+	return s
+end
+
+
+--------------------------------------------------------
+-- rtrim
+-- Remove white space from the end of a string, OR table of strings recursively
+-- Only act on strings
+-- If flag set, return nil for an empty string
+function rtrim(s, returnNil)
+	if (s) then
+		if (type(s) == "table") then
+			for i,v in ipairs(s) do
+				s[i] = rtrim(v, returnNil)
+			end
+		elseif (type(s) == "string") then
+			s = s:gsub("(.-)%s*$", "%1")
+		end
+	end
+	if (returnNil and s == "") then
+		return nil
+	end
+	return s
+end
+
+
 
 --------------------------------------------------------
 -- table merge
@@ -2830,7 +2874,7 @@ function showTestLine (g,x,y,t,leading)
 	leading = leading or 0
 	len = len or 100
 	local b = display.newLine(g, x, y, x+len, y)
-	b:setColor(0,0,100,0.9)
+	b:setStrokeColor(0,0,100,0.9)
 	local t = display.newText(g, "y="..y..":"..", "..leading..": "..t,x,y,"Georgia-Italic",9)
 	t:setFillColor(0,0,0)
 end
@@ -3264,10 +3308,12 @@ function stringToColorTable(s, toHDR, isHDR)
 			s = funx.split(s, ",")
 
 			local maxVal = 255	-- RGB max
+			--[[
 			local valSum = ( tonumber(s[1]) or 0) + (tonumber(s[2]) or 0) + (tonumber(s[3]) or 0)
 			if ( isHDR or  ( valSum > 0 and valSum <= 3 ) ) then
 				maxVal = 1	-- HDR max
 			end
+			--]]
 			
 			local opacity = string.lower(s[4] or maxVal)
 			if ( opacity == "opaque" ) then
@@ -3284,13 +3330,14 @@ function stringToColorTable(s, toHDR, isHDR)
 			end
 			
 			if (toHDR) then
-				s = { s[1]/255, s[2]/255, s[3]/255, s[4] }
+				s = { s[1]/255, s[2]/255, s[3]/255, s[4]/255 }
 			end
 		end
 	end
 	return s
 end
 
+-- *** Apparently, not necessary! I built this due to a bug in the dmc_kolor patch.
 -- Here's a shortcut for getting an HDR color from RGB or HDR values
 -- Set isHDR to true if the input string uses HDR values
 function stringToColorTableHDR(s, isHDR)
