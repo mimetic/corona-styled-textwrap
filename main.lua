@@ -128,7 +128,7 @@ tout.y = 30
 local t = textwrap.autoWrappedText(params)
 t:setReferencePoint(display.TopLeftReferencePoint)
 t.x = 20
-t.y = 20
+t.y = 40
 
 
 -- Frame the text

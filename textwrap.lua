@@ -169,7 +169,7 @@ end
 --------------------------------------------------------
 -- Get tag formatting values
 --------------------------------------------------------
-local function getTagFormatting(fontFaces, tag, currentfont, attr)
+local function getTagFormatting(fontFaces, tag, currentfont, variation, attr)
 	local font, basename
 			------------
 			-- If the fontfaces list has our font transformation, use it,
@@ -194,7 +194,7 @@ local function getTagFormatting(fontFaces, tag, currentfont, attr)
 	end
 
 	local basefont = gsub(currentfont, "%-.*$","")
-	local _,_,variation = find(currentfont, "%-(.-)$")
+	--local _,_,variation = find(currentfont, "%-(.-)$")
 	variation = variation or ""
 
 	local format = {}
@@ -202,14 +202,18 @@ local function getTagFormatting(fontFaces, tag, currentfont, attr)
 	if (tag == "em" or tag == "i") then
 		if (variation == "Bold" or variation == "BoldItalic") then
 			format.font = getFontFace (basefont, "-BoldItalic")
+			format.fontvariation = "BoldItalic"
 		else
 			format.font = getFontFace (basefont, "-Italic")
+			format.fontvariation = "Italic"
 		end
 	elseif (tag == "strong" or tag == "b") then
 		if (variation == "Italic" or variation == "BoldItalic") then
 			format.font = getFontFace (basefont, "-BoldItalic")
+			format.fontvariation = "BoldItalic"
 		else
 			format.font = getFontFace (basefont, "-Bold")
+			format.fontvariation = "Bold"
 		end
 	elseif (tag == "font" and attr) then
 		format = attr
@@ -390,7 +394,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local midscreenY = screenH*(0.5)
 
 	if (testing) then
-		print ("autoWrappedText: testing flag is true in line 335")
+		print ("autoWrappedText: testing flag is true.")
 	end
 
 	-- table for useful settings. We need fewer upvalues, and this is a way to do that
@@ -562,6 +566,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 
 	-- Combine a bunch of local variables into a settings array because we have too many "upvalues"!!!
 	settings.font = font or "Helvetica" --native.systemFont
+	 -- used to restore from bold, bold-italic, etc. since some names aren't clear, e.g. FoozleSemiBold might be the only bold for a font
+	settings.fontvariation = ""
 	settings.size = tonumber(size) or 12
 	settings.color = color or {0,0,0,0}
 	settings.width = funx.percentOfScreenWidth(width) or display.contentWidth
@@ -628,6 +634,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			local params = {}
 
 			params.font = settings.font
+			params.fontvariation = settings.fontvariation
 			-- font size
 			params.size = settings.size
 			params.minLineCharCount = settings.minLineCharCount
@@ -656,7 +663,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 		-- These are set using the values from internal variables, e.g. font or size,
 		-- NOT from the style sheet parameters.
 		local function setStyleSettings (params)
-			if (params.font ) then font = params.font end
+			if (params.font ) then settings.font = params.font end
+			if (params.fontvariation) then settings.fontvariation = params.fontvariation end
 				-- font size
 			if (params.size ) then settings.size = params.size end
 			if (params.minLineCharCount ) then settings.minLineCharCount = params.minLineCharCount end
@@ -771,11 +779,17 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 		-- fontFaces, font are in the closure!
 		local function setStyleFromTag (tag, attr)
 
-			local format = getTagFormatting(fontFaces, tag, settings.font, attr)
+			local format = getTagFormatting(fontFaces, tag, settings.font, settings.fontvariation, attr)
 			-- font
-			if (format.font) then settings.font = funx.trim(format.font) end
+			if (format.font) then
+				settings.font = funx.trim(format.font)
+				settings.fontvariation = format.fontvariation
+			end
 			-- font with CSS:
-			if (format['font-family']) then settings.font = funx.trim(format['font-family']) end
+			if (format['font-family']) then
+				settings.font = funx.trim(format['font-family'])
+				settings.fontvariation = format.fontvariation
+			end
 
 			-- font size
 			if (format['font-size'] or format['size']) then
@@ -1249,8 +1263,8 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 					-- NOT a <p>, but perhaps something inside <p></p>
 					------------------------------------------------------------
 					local function renderParsedElement(elementNum, element, tag, attr)
-					
-					
+
+
 							local tempLineWidth, words
 							local firstWord = true
 							local words
@@ -1264,7 +1278,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 							local xOffset = 0
 							local wordlen = 0
 
-				
+
 							-- ----------------------------------------------------------
 							-- <A> tag box. If we make the text itself touchable, it is easy to miss it...your touch
 							-- goes through the white spaces around letter strokes!
@@ -1283,7 +1297,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 								r:setFillColor(unpack(testBkgdColor))
 								r:setStrokeColor(0,250,250,125)
 
-								r.isVisible = testing								
+								r.isVisible = testing
 
 								if (lower(tag) == "a") then
 									local touchme = touchableBox(result, textDisplayReferencePoint, newDisplayLineGroup.x, newDisplayLineGroup.y - (fontInfo.capheight * settings.size)/4,  newDisplayLineText.width-2, fontInfo.capheight * settings.size, hyperlinkFillColor)
@@ -1292,13 +1306,12 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 									attachLinkToObj(newDisplayLineGroup, attr, settings.handler)
 								end
 							end
-					
-							
-							
+
+
+
 							-- Align the text on the row
 							local function positionNewDisplayLineX(newDisplayLineGroup)
 								local ta = lower(textAlignment)
---print ("positionNewDisplayLineX: x, xOffset, currentXOffset", x, xOffset, currentXOffset)
 
 								if (ta == "center") then
 									newDisplayLineGroup.x = x + settings.currentLeftIndent + xOffset
@@ -1306,11 +1319,10 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 									newDisplayLineGroup.x = x - xOffset
 								else
 									newDisplayLineGroup.x = x + settings.currentLeftIndent + settings.currentFirstLineIndent + xOffset
-print ("***** ",settings.currentLeftIndent + settings.currentFirstLineIndent + xOffset)
 								end
-								
+
 							end
-					
+
 							-- Align the text on the row
 							local function setCurrentXOffset(newDisplayLineText)
 								local ta = lower(textAlignment)
@@ -1324,15 +1336,17 @@ print ("***** ",settings.currentLeftIndent + settings.currentFirstLineIndent + x
 								end
 								print ( "setCurrentXOffset set currentXOffset to "..currentXOffset)
 							end
-														
 
-					
-					
-					
+
+
+
+
 							-- flag to indicate the text line to be rendered is the last line of the previously
 							-- rendered text (true) or is the continuation of that text (false)
 							-- Starts true for first item, then is false unless changed later.
-							renderTextFromMargin = (elementCounter == 1)
+							if (elementCounter == 1) then
+								--renderTextFromMargin = true
+							end
 
 							nextChunk = element or ""
 							nextChunkLen = strlen(nextChunk)
@@ -1417,8 +1431,6 @@ print ("***** ",settings.currentLeftIndent + settings.currentFirstLineIndent + x
 								words = gmatch(nextChunk, "([^%s%-]+)([%s%-]*)")
 							end
 
-							
-
 							---------------------------------------------
 							for word, spacer in words do
 								if (not textwrapIsCached) then
@@ -1436,7 +1448,6 @@ print ("***** ",settings.currentLeftIndent + settings.currentFirstLineIndent + x
 
 								-- Grab the first words of the line, until "minLineCharCount" hit
 								if (textwrapIsCached or (strlen(allTextInLine) > settings.minLineCharCount)) then
-
 									-- Allow for lines with beginning spaces, for positioning
 									if (usePeriodsForLineBeginnings and substring(currentLine,1,1) == ".") then
 										currentLine = substring(currentLine,2,-1)
@@ -1458,8 +1469,14 @@ print ("***** ",settings.currentLeftIndent + settings.currentFirstLineIndent + x
 											-- as text, then move down a line on the screen and start again.
 											if (renderTextFromMargin) then
 												tempLineWidth = tempDisplayLineTxt.width
+												if (isFirstLine) then
+													settings.currentFirstLineIndent = settings.firstLineIndent
+												else
+													settings.currentFirstLineIndent = 0
+												end
 											else
 												tempLineWidth = tempDisplayLineTxt.width + currentXOffset
+												settings.currentFirstLineIndent = 0
 											end
 
 										else
@@ -1474,46 +1491,43 @@ print ("***** ",settings.currentLeftIndent + settings.currentFirstLineIndent + x
 											currentLine = tempLine
 										else
 											if ( settings.maxHeight==0 or (lineY <= settings.maxHeight - currentLineHeight)) then
-											
+
 												-- It is possible the first word is so long that it doesn't fit
 												-- the margins (a 'B' line render, below), and in that case, the currentLine
 												-- is empty.
 												if (strlen(currentLine) > 0) then
-												
+
 	-- ============================================================
-	-- A: Render text that fills the entire line, that will continue on a following line. 
+	-- A: Render text that fills the entire line, that will continue on a following line.
 	-- This line always has text that continues on the next line.
 	-- ============================================================
-	
-	
-	
+
+
+
 													if (testing) then
-													print ()
-													print ("----------------------------")
-													print ("A: Render line: ["..currentLine .. "]")
-													print ("currentWidth",currentWidth)
-													print ("Render a line (start at margin?)", renderTextFromMargin)
-													print ("isFirstLine", isFirstLine)
-													print ("   newDisplayLineGroup.y = ",lineY + baselineAdjustment .. "+" .. baselineAdjustment)
+														print ()
+														print ("----------------------------")
+														print ("A: Render line: ["..currentLine .. "]")
+														print ("Font: [".. settings.font .. "]")
+														print ("currentWidth",currentWidth)
+														print ("isFirstLine", isFirstLine)
+														print ("renderTextFromMargin: ", renderTextFromMargin)
+														print ("   newDisplayLineGroup.y = ",lineY + baselineAdjustment .. "+" .. baselineAdjustment)
 													end
-												
+
 													if (isFirstLine) then
 														currentLineHeight = lineHeight
 														isFirstLine = false
-														renderTextFromMargin = true
 														settings.currentFirstLineIndent = settings.firstLineIndent
-														-- If first line of a block of text, then we must start on a new line.
-														-- Jump to next line to start this text
-														lineY = lineY + currentLineHeight + currentSpaceBefore
+														if (renderTextFromMargin) then
+															lineY = lineY + currentLineHeight + currentSpaceBefore
+														end
 													else
 														currentLineHeight = lineHeight
 														settings.currentFirstLineIndent = 0
-														-- Not first line in a block of text, there might be something before it on the line,
-														-- e.g. a Bold/Italic block, so do not jump to next row
-														--lineY = lineY + currentLineHeight
 													end
 
-													
+
 													if (renderTextFromMargin) then
 														settings.currentLeftIndent = settings.leftIndent
 														xOffset = 0
@@ -1585,11 +1599,11 @@ print ("A: xOffset", xOffset)
 													-- <A> tag box. If we make the text itself touchable, it is easy to miss it...your touch
 													-- goes through the white spaces around letter strokes!
 													createLinkingBox(newDisplayLineGroup, newDisplayLineText, textDisplayReferencePoint, currentLine )
-											
+
 													-- This line has now wrapped around, and the next one should start at the margin.
 													renderTextFromMargin = true
 													currentXOffset = 0
-												
+
 													-- And, we should now move our line cursor to the next row.
 													-- We know nothing can continue on this line because we've filled it up.
 													lineY = lineY + currentLineHeight
@@ -1601,16 +1615,16 @@ print ("A: xOffset", xOffset)
 														--yAdjustment = (settings.size * fontInfo.ascent )- newDisplayLineGroup.height
 														yAdjustment = ( (settings.size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLineGroup.height
 													end
-												
+
 												end
 
 
 												-- --------
 												-- END 'A' RENDER
 												-- --------
-												
-												
-												
+
+
+
 
 												if (textwrapIsCached or (wordlen <= currentWidth * widthCorrection) ) then
 
@@ -1652,15 +1666,15 @@ end
 														currentLineHeight = lineHeight
 														isFirstLine = false
 														settings.currentFirstLineIndent = settings.firstLineIndent
-														lineY = lineY + currentLineHeight + currentSpaceBefore
+														if (renderTextFromMargin) then
+															lineY = lineY + currentLineHeight + currentSpaceBefore
+														end
 													else
 														currentLineHeight = lineHeight
 														settings.currentFirstLineIndent = 0
-														--lineY = lineY + currentLineHeight
 													end
 
-													
-													-- This new line is at the old line baseline + leading
+
 													if (renderTextFromMargin) then
 														settings.currentLeftIndent = settings.leftIndent
 														xOffset = 0
@@ -1771,18 +1785,21 @@ end
 									print ()
 									print ("----------------------------")
 									print ("C: Final line: ["..currentLine.."]", "length=" .. strlen(currentLine))
+									print ("Font: [".. settings.font .. "]")
 									print ("isFirstLine", isFirstLine)
+									print ("renderTextFromMargin: ", renderTextFromMargin)
 								end
 
 
 								if (isFirstLine) then
 									currentLineHeight = lineHeight
-									isFirstLine = false
-									renderTextFromMargin = true
 									settings.currentFirstLineIndent = settings.firstLineIndent
 									-- If first line of a block of text, then we must start on a new line.
 									-- Jump to next line to start this text
-									lineY = lineY + currentLineHeight + currentSpaceBefore
+									if (renderTextFromMargin ) then
+										lineY = lineY + currentLineHeight + currentSpaceBefore
+									end
+									--renderTextFromMargin = true
 								else
 									currentLineHeight = lineHeight
 									settings.currentFirstLineIndent = 0
@@ -1794,10 +1811,12 @@ end
 								if (renderTextFromMargin) then
 									xOffset = 0
 									settings.currentLeftIndent = settings.leftIndent
+									renderTextFromMargin = false
 								else
 									xOffset = currentXOffset
 									settings.currentFirstLineIndent = 0
 									settings.currentLeftIndent = 0
+									--isFirstLine = false
 								end
 
 								-- We have the current line from the code above if this is not cached text.
@@ -1809,11 +1828,9 @@ end
 
 
 								if (testing) then
-									print ("Start at margin)", renderTextFromMargin)
 									print ("Previous Line:", "["..prevTextInLine.."]", strlen(prevTextInLine))
 									print ("lineY:",lineY)
 									print ("currentSpaceBefore:",currentSpaceBefore)
-									print ("X=",x)
 									if (currentSpaceBefore > 0) then
 										print ("************")
 									end
@@ -1821,54 +1838,54 @@ end
 
 								--print ("C: render a line:", currentLine)
 
-									local newDisplayLineGroup = display.newGroup()
-									--newDisplayLineGroup.anchorChildren = true
+								local newDisplayLineGroup = display.newGroup()
+								--newDisplayLineGroup.anchorChildren = true
 
-									local newDisplayLineText = display.newText({
-										parent = newDisplayLineGroup,
-										text = currentLine,
-										x = 0, y = 0,
-										font = settings.font,
-										fontSize = settings.size,
-										align = lower(textAlignment) or "left",
-									})
-									newDisplayLineText:setFillColor(unpack(settings.color))
-									newDisplayLineText:setReferencePoint(textDisplayReferencePoint)
-									newDisplayLineText.x, newDisplayLineText.y = 0, 0
-									--newDisplayLineText.alpha = settings.opacity
+								local newDisplayLineText = display.newText({
+									parent = newDisplayLineGroup,
+									text = currentLine,
+									x = 0, y = 0,
+									font = settings.font,
+									fontSize = settings.size,
+									align = lower(textAlignment) or "left",
+								})
+								newDisplayLineText:setFillColor(unpack(settings.color))
+								newDisplayLineText:setReferencePoint(textDisplayReferencePoint)
+								newDisplayLineText.x, newDisplayLineText.y = 0, 0
+								--newDisplayLineText.alpha = settings.opacity
 
-									result:insert(newDisplayLineGroup)
-									newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
-									newDisplayLineGroup.x, newDisplayLineGroup.y = x, lineY
+								result:insert(newDisplayLineGroup)
+								newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
+								newDisplayLineGroup.x, newDisplayLineGroup.y = x, lineY
 
-									positionNewDisplayLineX(newDisplayLineGroup, xOffset)
-								
-									newDisplayLineGroup.y = lineY + baselineAdjustment
-								
-									-- We don't know if we have added a line...this text might be inside another line.
-									-- So we don't increment line count
-									-- lineCount = lineCount + 1
-									
-									-- We know this is a short line, and it is possible the next chunk of text
-									-- will begin on the same line, so we capture the x value. So, set the 
-									-- currentXOffset value so the next text starts in the right column.
-									setCurrentXOffset(newDisplayLineText, xOffset)
+								positionNewDisplayLineX(newDisplayLineGroup, xOffset)
 
-									-- Save the current line if we started at the margin
-									-- So the next line, if it has to, can start where this one ends.
-									prevTextInLine = prevTextInLine .. currentLine
+								newDisplayLineGroup.y = lineY + baselineAdjustment
 
-									-- Since line heights are not predictable, we capture the yAdjustment based on
-									-- the actual height the first rendered line of text
-									if (not yAdjustment or yAdjustment == 0) then
-										--yAdjustment = (settings.size * fontInfo.ascent )- newDisplayLineGroup.height
-										yAdjustment = ( (settings.size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLineGroup.height
-									end
+								-- We don't know if we have added a line...this text might be inside another line.
+								-- So we don't increment line count
+								-- lineCount = lineCount + 1
 
-									createLinkingBox(newDisplayLineGroup, newDisplayLineText, textDisplayReferencePoint, currentLine, {250,0,0,30})
+								-- We know this is a short line, and it is possible the next chunk of text
+								-- will begin on the same line, so we capture the x value. So, set the
+								-- currentXOffset value so the next text starts in the right column.
+								setCurrentXOffset(newDisplayLineText, xOffset)
 
-									-- Clear the current line
-									currentLine = ""
+								-- Save the current line if we started at the margin
+								-- So the next line, if it has to, can start where this one ends.
+								prevTextInLine = prevTextInLine .. currentLine
+
+								-- Since line heights are not predictable, we capture the yAdjustment based on
+								-- the actual height the first rendered line of text
+								if (not yAdjustment or yAdjustment == 0) then
+									--yAdjustment = (settings.size * fontInfo.ascent )- newDisplayLineGroup.height
+									yAdjustment = ( (settings.size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLineGroup.height
+								end
+
+								createLinkingBox(newDisplayLineGroup, newDisplayLineText, textDisplayReferencePoint, currentLine, {250,0,0,30})
+
+								-- Clear the current line
+								currentLine = ""
 
 							end
 
@@ -1948,8 +1965,7 @@ end
 						end
 
 					elseif (tag == "br") then
-
-					end
+ 					end
 
 					if (tag == "a") then
 						setStyleFromTag (tag, attr)

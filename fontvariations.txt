@@ -41,19 +41,19 @@ ArialHebrew-Bold = ArialHebrew-Bold
 #ArialRoundedMTBold = ArialRoundedMTBold
 
 #Avenir
+Avenir-Bold = Avenir-Medium
+Avenir-BoldItalic = Avenir-MediumOblique
+Avenir-Italic = Avenir-Oblique
 Avenir-Black = Avenir-Black
 Avenir-BlackOblique = Avenir-BlackOblique
 Avenir-Book = Avenir-Book
-Avenir-Bold = Avenir-Medium
 Avenir-BookOblique = Avenir-BookOblique
 Avenir-Heavy = Avenir-Heavy
 Avenir-HeavyOblique = Avenir-HeavyOblique
 Avenir-Light = Avenir-Light
 Avenir-LightOblique = Avenir-LightOblique
 Avenir-Roman-Bold = Avenir-Medium
-Avenir-MediumOblique = Avenir-MediumOblique
 Avenir-Roman-Italic = Avenir-Oblique
-Avenir-Italic = Avenir-Oblique
 
 #Avenir Next
 AvenirNext-Bold = AvenirNext-Bold
@@ -141,6 +141,12 @@ CourierNewPS-BoldItalicMT = CourierNewPS-BoldItalicMT
 CourierNewPS-BoldMT = CourierNewPS-BoldMT
 CourierNewPS-ItalicMT = CourierNewPS-ItalicMT
 #CourierNewPSMT = CourierNewPSMT
+
+#CrimsonText-Roman
+CrimsonText = CrimsonText-Roman
+CrimsonText-Bold = CrimsonText-Semibold
+CrimsonText-BoldItalic = CrimsonText-SemiboldItalic
+CrimsonText-Italic = CrimsonText-Italic
 
 #DB LCD Temp
 #DBLCDTempBlack = DBLCDTempBlack

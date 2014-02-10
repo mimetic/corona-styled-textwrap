@@ -1,3 +1,6 @@
+<p class="Normal"><b><i>B-Style:</i> the parameter 'isHTML' is OmyGodThisisaverylongwordOmyGodThisisaverylongword</b> This is normal text, of course!</p>
+
+
 <p><i><b>Note:</b> the parameter 'isHTML' is true!</i></p>
 <br>  
 <br> 
