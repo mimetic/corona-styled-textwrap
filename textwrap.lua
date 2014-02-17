@@ -584,7 +584,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	settings.minLineCharCount = minCharCount or 5
 	settings.maxHeight = tonumber(maxHeight) or 0
 
-
 	------ POSITIONING RECT
 	-- Need a positioning rect so that indents work.
 	-- Width must be full-width so the right-justified works.
@@ -1326,7 +1325,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 
 
 							-- Align the text on the row
-							local function positionNewDisplayLineX(newDisplayLineGroup, w)
+							local function positionNewDisplayLineX(newDisplayLineGroup, w, currentWidth)
 								local ta = lower(textAlignment)
 
 								if (ta == "center") then
@@ -1373,7 +1372,11 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 
 
 							-- Set the current width of the column, factoring in indents
-							--currentWidth = settings.width - settings.leftIndent - settings.rightIndent - settings.currentFirstLineIndent
+							-- IS THIS RIGHT?!?!?!?
+if (testing) then
+	print ("Set current width at 1376")
+end
+							currentWidth = settings.width - settings.leftIndent - settings.rightIndent - settings.currentFirstLineIndent
 
 
 							------------------------------------------------
@@ -1445,6 +1448,8 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 								cachedChunk = { text = {}, width = {} }
 								words = gmatch(nextChunk, "([^%s%-]+)([%s%-]*)")
 							end
+							
+							local textAlignmentForRender = lower(textAlignment) or "left"
 
 							---------------------------------------------
 							for word, spacer in words do
@@ -1475,8 +1480,16 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 									else
 										if (not textwrapIsCached) then
 											-- Draw the text as a line.								-- Trim based on alignment!
-											tempDisplayLineTxt = display.newText(trimByAlignment(tempLine), x, 0, settings.font, settings.size)
-											tempDisplayLineTxt:setReferencePoint(display.TopLeftReferencePoint)
+											tempDisplayLineTxt = display.newText({
+												text=trimByAlignment(tempLine),
+												x=x,
+												y=0,
+												font = settings.font,
+												fontSize = settings.size,
+												align = textAlignmentForRender or "left",
+											})
+
+										tempDisplayLineTxt:setReferencePoint(display.TopLeftReferencePoint)
 											tempDisplayLineTxt.x = 0
 											tempDisplayLineTxt.y = 0
 
@@ -1503,7 +1516,9 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 										currentWidth = settings.width - settings.leftIndent - settings.rightIndent - settings.currentFirstLineIndent
 
 										if (tempLineWidth <= currentWidth * widthCorrection )  then
-											currentLine = trimByAlignment(tempLine)
+											-- No, this removes spaces between words!
+											--currentLine = trimByAlignment(tempLine)
+											currentLine = tempLine
 										else
 											if ( settings.maxHeight==0 or (lineY <= settings.maxHeight - currentLineHeight)) then
 
@@ -1561,7 +1576,8 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 													cachedChunkLine = cachedChunkLine + 1
 
 													local newDisplayLineGroup = display.newGroup()
-													--newDisplayLineGroup.anchorChildren = true
+
+													currentLine = trimByAlignment(currentLine)
 
 													local newDisplayLineText = display.newText({
 														parent=newDisplayLineGroup,
@@ -1569,7 +1585,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 														x=0, y=0,
 														font=settings.font,
 														fontSize = settings.size,
-														align = lower(textAlignment) or "left",
+														align = textAlignmentForRender,
 													})
 													newDisplayLineText:setFillColor(unpack(settings.color))
 													newDisplayLineText:setReferencePoint(textDisplayReferencePoint)
@@ -1582,7 +1598,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 													-- Adjust Y to the baseline, not top-left corner of the font bounding-box
 													newDisplayLineGroup.y = lineY + baselineAdjustment
 
-													positionNewDisplayLineX(newDisplayLineGroup, newDisplayLineText.width)
+													positionNewDisplayLineX(newDisplayLineGroup, newDisplayLineText.width, currentWidth)
 
 
 													lineCount = lineCount + 1
@@ -1700,6 +1716,8 @@ end
 
 													local newDisplayLineGroup = display.newGroup()
 													--newDisplayLineGroup.anchorChildren = true
+													
+													word = trimByAlignment(word)
 
 													local newDisplayLineText = display.newText({
 														parent = newDisplayLineGroup,
@@ -1707,7 +1725,7 @@ end
 														x = 0, y = 0,
 														font = settings.font,
 														fontSize = settings.size,
-														align = lower(textAlignment) or "left",
+														align = textAlignmentForRender,
 													})
 
 													newDisplayLineText:setFillColor(unpack(settings.color))
@@ -1719,7 +1737,7 @@ end
 													newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
 													newDisplayLineGroup.x, newDisplayLineGroup.y = x, lineY + baselineAdjustment
 
-													positionNewDisplayLineX(newDisplayLineGroup, xOffset)
+													positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
 
 													lineCount = lineCount + 1
 													currentLine = ''
@@ -1802,6 +1820,9 @@ end
 									print ("Font: [".. settings.font .. "]")
 									print ("isFirstLine", isFirstLine)
 									print ("renderTextFromMargin: ", renderTextFromMargin)
+									print ("Width,", settings.width)
+									print ("C) currentWidth", currentWidth)
+
 								end
 
 
@@ -1854,6 +1875,8 @@ end
 
 								local newDisplayLineGroup = display.newGroup()
 								--newDisplayLineGroup.anchorChildren = true
+								
+								currentLine = trimByAlignment(currentLine)
 
 								local newDisplayLineText = display.newText({
 									parent = newDisplayLineGroup,
@@ -1861,7 +1884,7 @@ end
 									x = 0, y = 0,
 									font = settings.font,
 									fontSize = settings.size,
-									align = lower(textAlignment) or "left",
+									align = textAlignmentForRender,
 								})
 								newDisplayLineText:setFillColor(unpack(settings.color))
 								newDisplayLineText:setReferencePoint(textDisplayReferencePoint)
@@ -1872,7 +1895,7 @@ end
 								newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
 								newDisplayLineGroup.x, newDisplayLineGroup.y = x, lineY
 
-								positionNewDisplayLineX(newDisplayLineGroup, xOffset)
+								positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
 
 								newDisplayLineGroup.y = lineY + baselineAdjustment
 
@@ -2136,9 +2159,10 @@ end
 
 	-----------------------------
 	-- Finished rendering all blocks of text (all paragraphs).
+	-- Anchor the text block TOP-LEFT by default
 	-----------------------------
-
-	result:setReferencePoint(display.CenterReferencePoint)
+	result.anchorChildren = true
+	result.anchorX, result.anchorY = 0,0
 
 	--print ("textwrap.lua: yAdjustment is turned OFF because it wasn't working! No idea why.")
 	result.yAdjustment = yAdjustment
