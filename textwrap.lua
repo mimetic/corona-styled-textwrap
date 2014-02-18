@@ -1452,6 +1452,8 @@ end
 							local textAlignmentForRender = lower(textAlignment) or "left"
 
 							---------------------------------------------
+							--local word,spacer
+							local word, space, longword
 							for word, spacer in words do
 								if (not textwrapIsCached) then
 									if (firstWord) then
@@ -1472,7 +1474,7 @@ end
 									if (usePeriodsForLineBeginnings and substring(currentLine,1,1) == ".") then
 										currentLine = substring(currentLine,2,-1)
 									end
-
+									
 									-- If a word is less than the minimum word length, force it to be with the next word,so lines don't end with single letter words.
 									if (not textwrapIsCached and (strlen(allTextInLine) < nextChunkLen) and strlen(word) < settings.minWordLen) then
 										shortword = shortword..word..spacer
@@ -1514,7 +1516,7 @@ end
 
 										-- Since indents may change per line, we have to reset this each time.
 										currentWidth = settings.width - settings.leftIndent - settings.rightIndent - settings.currentFirstLineIndent
-
+										
 										if (tempLineWidth <= currentWidth * widthCorrection )  then
 											-- No, this removes spaces between words!
 											--currentLine = trimByAlignment(tempLine)
@@ -1622,8 +1624,22 @@ end
 													wordlen = 0
 													if (textwrapIsCached) then
 														wordlen = cachedChunk.width[cachedChunkLine]
-													else
+													elseif ( word ~= nil ) then
 														wordlen = strlen(word) * (settings.size * fontInfo.maxCharWidth)
+														
+														local tempWord = display.newText({
+														    text=word,
+														    x=0, y=0,
+														    font=settings.font,
+														    fontSize = settings.size,
+														    align = textAlignmentForRender,
+													    })
+													    wordlen = tempWord.width
+													    tempWord:removeSelf()
+													    tempWord =  nil
+						
+													else
+													    wordlen = 0
 													end
 
 													-- <A> tag box. If we make the text itself touchable, it is easy to miss it...your touch
@@ -1645,7 +1661,12 @@ end
 														--yAdjustment = (settings.size * fontInfo.ascent )- newDisplayLineGroup.height
 														yAdjustment = ( (settings.size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLineGroup.height
 													end
-
+												    else
+													--longword = true
+													
+													renderTextFromMargin = true
+													currentXOffset = 0
+													lineY = lineY + currentLineHeight
 												end
 
 
@@ -1656,7 +1677,7 @@ end
 
 
 
-												if (textwrapIsCached or (wordlen <= currentWidth * widthCorrection) ) then
+												if (textwrapIsCached or (not longword and wordlen <= currentWidth * widthCorrection) ) then
 
 													if (textwrapIsCached) then
 														currentLine = word
@@ -1668,8 +1689,9 @@ end
 
 -- ----------------------------------------------------
 -- ----------------------------------------------------
--- B: The word at the end of a line is too large to fit
--- the text column! Very rare.
+-- B: The word at the end of a line is too long to fit the text column! Very rare.
+-- Example: <span>Cows are nice to <span><span>elep|hants.<span>
+-- Where | is the column end.
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 
