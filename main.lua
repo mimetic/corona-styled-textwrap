@@ -46,7 +46,7 @@ local midscreenX = screenW*(0.5)
 local midscreenY = screenH*(0.5)
 
 local w = screenW/2
-w = 470
+w = 401
 
 local textStyles = funx.loadTextStyles("textstyles.txt", system.ResourceDirectory)
 
@@ -149,3 +149,30 @@ bkgd:setReferencePoint(display.TopLeftReferencePoint)
 bkgd.x = 0
 bkgd.y = 0
 bkgd:toBack()
+
+
+
+
+
+	local widget = require ( "widget" )
+	local wf = false
+	local function toggleWireframe()
+		wf = not wf
+		display.setDrawMode( "wireframe", wf )
+		if (not wf) then
+			display.setDrawMode( "forceRender" )
+		end
+		print ("WF = ",wf)
+	end
+
+	local wfb = widget.newButton{
+				label = "WIREFRAME",
+				labelColor = { default={ 200, 1, 1 }, over={ 250, 0, 0, 0.5 } },
+				fontSize = 20,
+				x =screenW - 100,
+				y=50,
+				defaultFile = "",
+				overFile = "",
+				onRelease = toggleWireframe,
+			}
+	wfb:toFront()

@@ -779,6 +779,9 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 		local function setStyleFromTag (tag, attr)
 
 			local format = getTagFormatting(fontFaces, tag, settings.font, settings.fontvariation, attr)
+			if (not format or format == {}) then
+				return 
+			end
 			-- font
 			if (format.font) then
 				settings.font = funx.trim(format.font)
@@ -825,12 +828,13 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				end
 			end
 
-
 			-- width of the text block
 			if (format.width) then
 				if (format.width == "reset" or format.width == "r") then
 					settings.width = defaultSettings.width
 				else
+					-- Remove "px" from the width value if it is there.
+					format.width = format.width:gsub("px$","")
 					settings.width = tonumber(funx.percentOfScreenWidth(format.width) or defaultSettings.width)
 				end
 				settings.minLineCharCount = minCharCount or 5
@@ -1125,6 +1129,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 				-- If previous paragraph had a soft return, don't add space before, nor indent the 1st line
 				if (prevLineBreakType == "soft") then
 					settings.currentFirstLineIndent = 0
+					currentSpaceAfter = 0
 					currentSpaceBefore = 0
 				end
 
@@ -1549,6 +1554,7 @@ end
 
 													if (isFirstLine) then
 														currentLineHeight = lineHeight
+														currentSpaceBefore = settings.spaceBefore
 														isFirstLine = false
 														settings.currentFirstLineIndent = settings.firstLineIndent
 														if (renderTextFromMargin) then
@@ -1556,6 +1562,7 @@ end
 														end
 													else
 														currentLineHeight = lineHeight
+														currentSpaceBefore = 0
 														settings.currentFirstLineIndent = 0
 													end
 
@@ -1567,6 +1574,11 @@ end
 														xOffset = currentXOffset
 														settings.currentFirstLineIndent = 0
 														settings.currentLeftIndent = 0
+													end
+													
+													-- Works for left-aligned...right is a mess anyway.
+													if (renderTextFromMargin or isFirstLine) then
+														currentLine = funx.trim(currentLine)
 													end
 
 													if (textwrapIsCached) then
@@ -1716,6 +1728,7 @@ end
 
 													if (isFirstLine) then
 														currentLineHeight = lineHeight
+														currentSpaceBefore = settings.spaceBefore
 														isFirstLine = false
 														settings.currentFirstLineIndent = settings.firstLineIndent
 														if (renderTextFromMargin) then
@@ -1723,6 +1736,7 @@ end
 														end
 													else
 														currentLineHeight = lineHeight
+														currentSpaceBefore = 0
 														settings.currentFirstLineIndent = 0
 													end
 
@@ -1849,7 +1863,9 @@ end
 
 
 								if (isFirstLine) then
+									isFirstLine = false
 									currentLineHeight = lineHeight
+									currentSpaceBefore = settings.spaceBefore
 									settings.currentFirstLineIndent = settings.firstLineIndent
 									-- If first line of a block of text, then we must start on a new line.
 									-- Jump to next line to start this text
@@ -1860,6 +1876,7 @@ end
 								else
 									currentLineHeight = lineHeight
 									settings.currentFirstLineIndent = 0
+									currentSpaceBefore = 0
 									-- Not first line in a block of text, there might be something before it on the line,
 									-- e.g. a Bold/Italic block, so do not jump to next row
 									--lineY = lineY + currentLineHeight
@@ -1887,7 +1904,8 @@ end
 								if (testing) then
 									print ("Previous Line:", "["..prevTextInLine.."]", strlen(prevTextInLine))
 									print ("lineY:",lineY)
-									print ("currentSpaceBefore:",currentSpaceBefore)
+									print ("currentSpaceBefore:",currentSpaceBefore, settings.spaceBefore)
+									print ("currentSpaceAfter:",currentSpaceAfter, settings.spaceAfter)
 									if (currentSpaceBefore > 0) then
 										print ("************")
 									end
@@ -1995,6 +2013,10 @@ end
 						end
 						setStyleFromTag (tag, attr)
 
+						currentSpaceBefore = settings.spaceBefore
+						currentSpaceAfter = settings.spaceAfter
+
+
 						-- LISTS
 						if (tag == "ol" or tag == "ul" ) then
 							-- Nested lists require indentation (which isn't happening yet) and a new line.
@@ -2020,6 +2042,8 @@ end
 									b = "&#8211;"
 								elseif (attr.bullet == "mdash") then
 									b = "&#8212;"
+								elseif (attr.bullet == "none") then
+									b = ""
 								else
 									b = "&#9679;"
 								end
@@ -2048,6 +2072,8 @@ end
 							t = stacks.list[stacks.list.ptr].bullet
 
 						end
+						-- add a space after the bullet
+						t = t .. " "
 						local e = renderParsedElement(1, t, "", "")
 						-- Add one to the element counter so the next thing won't be on a new line
 						elementCounter = elementCounter + 1
