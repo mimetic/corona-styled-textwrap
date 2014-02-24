@@ -162,7 +162,7 @@ local function convertValuesToPixels (t, deviceMetrics)
 	if (u == "pt" and deviceMetrics) then
 		n = n * (deviceMetrics.ppi/72)
 	end
-	return n
+	return tonumber(n)
 end
 
 
@@ -295,7 +295,7 @@ local function loadTextWrapFromCache(id, cacheDir)
 		local p = {}
 		if (funx.fileExists(fn, system.CachesDirectory)) then
 			p = funx.loadTable(fn, system.CachesDirectory)
-			--print ("cacheTemplatizedPage: found page "..fn )
+--print ("cacheTemplatizedPage: found page "..fn )
 			return p
 		end
 	end
@@ -313,6 +313,35 @@ local function iteratorOverCacheText (t)
 			return t[i], ""
 		end
 	end
+end
+
+-- Create a cache chunk table from either an existing cache entry or for a chunk of XML for the cache table.
+-- A chunk may have multiple lines.
+-- Weird to use separate tables for each attribute? But this allows us to iterate over the words
+-- instead of over the cache entry, allowing us to use the existing for-do structure.
+local function newCacheChunk ( cachedChunk )
+	
+	cachedChunk = {
+						text = {}, 
+						item = {},
+					}
+	
+	return cachedChunk
+end
+
+
+-- Get a chunk entry from the cache table
+local function getCachedChunkItem(t, i)
+	return t.item[i]
+end
+
+local function updateCachedChunk (t, args)
+	local i = args.index or 1
+	-- Write all in one entry
+	t.item[i] = args
+	-- Write text table for iteration
+	t.text[i] = args.text
+	return t
 end
 
 
@@ -395,6 +424,9 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 
 	if (testing) then
 		print ("autoWrappedText: testing flag is true.")
+		print ("----------")
+		--print (text.text)
+		--print ("----------")
 	end
 
 	-- table for useful settings. We need fewer upvalues, and this is a way to do that
@@ -415,7 +447,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	-- Get from the funx textStyles variable.
 	local textstyles = textstyles or {}
 
-
+	local hyperlinkFillColor
 
 	-- If table passed, then extract values
 	if (type(text) == "table") then
@@ -448,7 +480,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local textUID = 0
 	local textwrapIsCached = false
 	local cache = { { text = "", width = "", } }
-	local cacheChunkCtr = 1
+	local cacheIndex = 1
 
 	if ( cacheDir and cacheDir ~= "" ) then
 		textUID = "cache"..funx.checksum(text).."_"..tostring(width)
@@ -456,6 +488,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 		if (res) then
 			textwrapIsCached = true
 			cache = res
+			--print ("***** CACHE LOADED")
 		end
 	end
 
@@ -1274,7 +1307,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 							local words
 							local nextChunk, nextChunkLen
 							local cachedChunk
-							local cachedChunkLine = 1
+							local cachedChunkIndex = 1
 							local currentWidth
 							local tempDisplayLineTxt
 							local result, resultPosRect
@@ -1378,9 +1411,6 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 
 							-- Set the current width of the column, factoring in indents
 							-- IS THIS RIGHT?!?!?!?
-if (testing) then
-	print ("Set current width at 1376")
-end
 							currentWidth = settings.width - settings.leftIndent - settings.rightIndent - settings.currentFirstLineIndent
 
 
@@ -1446,20 +1476,131 @@ end
 
 							-- If the line wrapping is cached, get it
 							if (textwrapIsCached) then
-								cachedChunk = cache[cacheChunkCtr]
+								cachedChunk = cache[cacheIndex]
 								--words = gmatch(cachedChunk.text, "[^\r\n]+")
 								words = iteratorOverCacheText(cachedChunk.text)
 							else
-								cachedChunk = { text = {}, width = {} }
+								cachedChunk = newCacheChunk()
 								words = gmatch(nextChunk, "([^%s%-]+)([%s%-]*)")
 							end
 							
 							local textAlignmentForRender = lower(textAlignment) or "left"
 
+
+-- ============================================================
+-- CACHED RENDER
+-- ============================================================
+
+if (textwrapIsCached) then
+	if (testing) then
+		print ("Rendering from cache.")
+	end
+	
+	for cachedChunkIndex, text in pairs(cachedChunk.text) do
+		
+		local cachedItem = getCachedChunkItem(cachedChunk, cachedChunkIndex)
+
+		if (cachedItem.isFirstLine) then
+			isFirstLine = false
+			currentLineHeight = lineHeight
+			currentSpaceBefore = settings.spaceBefore
+			settings.currentFirstLineIndent = settings.firstLineIndent
+			-- If first line of a block of text, then we must start on a new line.
+			-- Jump to next line to start this text
+			if (renderTextFromMargin ) then
+				lineY = lineY + currentLineHeight + currentSpaceBefore
+			end
+			--renderTextFromMargin = true
+		else
+			currentLineHeight = lineHeight
+			settings.currentFirstLineIndent = 0
+			currentSpaceBefore = 0
+			-- Not first line in a block of text, there might be something before it on the line,
+			-- e.g. a Bold/Italic block, so do not jump to next row
+			--lineY = lineY + currentLineHeight
+		end
+
+		if (cachedItem.renderTextFromMargin) then
+			xOffset = 0
+			settings.currentLeftIndent = settings.leftIndent
+			renderTextFromMargin = false
+		else
+			xOffset = currentXOffset
+			settings.currentFirstLineIndent = 0
+			settings.currentLeftIndent = 0
+			--isFirstLine = false
+		end
+		
+		
+		-- Cached values
+		currentSpaceBefore = cachedItem.currentSpaceBefore
+		lineHeight = cachedItem.lineHeight
+		xOffset = cachedItem.xOffset
+		
+		textDisplayReferencePoint = display["Bottom"..textAlignment.."ReferencePoint"]
+		
+
+								local newDisplayLineGroup = display.newGroup()
+								--newDisplayLineGroup.anchorChildren = true
+								
+								local newDisplayLineText = display.newText({
+									parent = newDisplayLineGroup,
+									text = text,
+									x = 0, y = 0,
+									font = cachedItem.font,
+									fontSize = cachedItem.fontSize,
+									align = cachedItem.align,
+								})
+
+								newDisplayLineText:setFillColor(unpack(cachedItem.color))
+								newDisplayLineText:setReferencePoint(textDisplayReferencePoint)
+								newDisplayLineText.x, newDisplayLineText.y = 0,0
+								--newDisplayLineText.alpha = settings.opacity
+
+								result:insert(newDisplayLineGroup)
+								newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
+								newDisplayLineGroup.x, newDisplayLineGroup.y = cachedItem.x, cachedItem.y
+
+								--positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
+
+								lineCount = lineCount + 1
+
+								-- Use once, then set to zero.
+								settings.currentFirstLineIndent = 0
+
+								-- <A> tag box. If we make the text itself touchable, it is easy to miss it...your touch
+								-- goes through the white spaces around letter strokes!
+								createLinkingBox(newDisplayLineGroup, newDisplayLineText, textDisplayReferencePoint, currentLine, {250,0,250,30} )
+								
+								lineCount = lineCount + 1
+								
+								if (not yAdjustment or yAdjustment == 0) then
+									--yAdjustment = (settings.size * fontInfo.ascent )- newDisplayLineGroup.height
+									yAdjustment = ( (settings.size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLineGroup.height
+								end
+
+
+	end -- for
+	
+	cacheIndex = cacheIndex + 1
+	return result
+
+else
+
+-- ============================================================
+-- UNCACHED RENDER (writes to cache)
+-- ============================================================
+
+
+	if (testing) then
+		print ("Rendering from XML, not cache.")
+	end
+
 							---------------------------------------------
 							--local word,spacer
-							local word, space, longword
+							local word, spacer, longword
 							for word, spacer in words do
+
 								if (not textwrapIsCached) then
 									if (firstWord) then
 										word = padding .. word
@@ -1470,6 +1611,7 @@ end
 								else
 									spacer = ""
 									tempLine = word
+									--currentLine = word
 								end
 								allTextInLine = prevTextInLine .. tempLine
 
@@ -1483,23 +1625,24 @@ end
 									-- If a word is less than the minimum word length, force it to be with the next word,so lines don't end with single letter words.
 									if (not textwrapIsCached and (strlen(allTextInLine) < nextChunkLen) and strlen(word) < settings.minWordLen) then
 										shortword = shortword..word..spacer
-
 									else
 										if (not textwrapIsCached) then
 											-- Draw the text as a line.								-- Trim based on alignment!
 											tempDisplayLineTxt = display.newText({
 												text=trimByAlignment(tempLine),
-												x=x,
+												x=0,
 												y=0,
 												font = settings.font,
 												fontSize = settings.size,
 												align = textAlignmentForRender or "left",
 											})
 
-										tempDisplayLineTxt:setReferencePoint(display.TopLeftReferencePoint)
+											tempDisplayLineTxt:setReferencePoint(display.TopLeftReferencePoint)
 											tempDisplayLineTxt.x = 0
 											tempDisplayLineTxt.y = 0
-
+											
+											tempLineWidth = tempDisplayLineTxt.width
+											
 											-- Is this line of text too long? In which case we render the line
 											-- as text, then move down a line on the screen and start again.
 											if (renderTextFromMargin) then
@@ -1513,25 +1656,40 @@ end
 												tempLineWidth = tempDisplayLineTxt.width + currentXOffset
 												settings.currentFirstLineIndent = 0
 											end
+											
+											display.remove(tempDisplayLineTxt);
+											tempDisplayLineTxt=nil;
 
 										else
 											-- CACHED LINE
-											tempLineWidth = cachedChunk.width[cachedChunkLine]
+											tempLineWidth = cachedChunk.width[cachedChunkIndex]
+
+											if (renderTextFromMargin) then
+												if (isFirstLine) then
+													settings.currentFirstLineIndent = settings.firstLineIndent
+												else
+													settings.currentFirstLineIndent = 0
+												end
+											else
+												tempLineWidth = tempLineWidth + currentXOffset
+												settings.currentFirstLineIndent = 0
+											end
+
 										end
+
 
 										-- Since indents may change per line, we have to reset this each time.
 										currentWidth = settings.width - settings.leftIndent - settings.rightIndent - settings.currentFirstLineIndent
 										
-										if (tempLineWidth <= currentWidth * widthCorrection )  then
-											-- No, this removes spaces between words!
-											--currentLine = trimByAlignment(tempLine)
+										if (tempLineWidth <= currentWidth * widthCorrection)  then
+											-- Do not render line, unless it is the last word,
+											-- in which case render ("C" render)
 											currentLine = tempLine
 										else
 											if ( settings.maxHeight==0 or (lineY <= settings.maxHeight - currentLineHeight)) then
 
 												-- It is possible the first word is so long that it doesn't fit
-												-- the margins (a 'B' line render, below), and in that case, the currentLine
-												-- is empty.
+												-- the margins (a 'B' line render, below), and in that case, the currentLine is empty.
 												if (strlen(currentLine) > 0) then
 
 	-- ============================================================
@@ -1576,22 +1734,17 @@ end
 														settings.currentLeftIndent = 0
 													end
 													
-													-- Works for left-aligned...right is a mess anyway.
-													if (renderTextFromMargin or isFirstLine) then
-														currentLine = funx.trim(currentLine)
+													if (not textwrapIsCached) then
+														-- Works for left-aligned...right is a mess anyway.
+														if (renderTextFromMargin or isFirstLine) then
+															currentLine = funx.trim(currentLine)
+														end
+														currentLine = trimByAlignment(currentLine)
+														--cachedChunk.text[cachedChunkIndex] = currentLine
+														--cachedChunk.width[cachedChunkIndex] = tempLineWidth	
 													end
-
-													if (textwrapIsCached) then
-														currentLine = word
-													else
-														cachedChunk.text[cachedChunkLine] = currentLine
-														cachedChunk.width[cachedChunkLine] = tempLineWidth
-													end
-													cachedChunkLine = cachedChunkLine + 1
-
+													
 													local newDisplayLineGroup = display.newGroup()
-
-													currentLine = trimByAlignment(currentLine)
 
 													local newDisplayLineText = display.newText({
 														parent=newDisplayLineGroup,
@@ -1614,6 +1767,29 @@ end
 
 													positionNewDisplayLineX(newDisplayLineGroup, newDisplayLineText.width, currentWidth)
 
+													-- CACHE this line
+													if (not textwrapIsCached) then
+														updateCachedChunk (cachedChunk, { 
+																	index = cachedChunkIndex, 
+																	text = currentLine,
+																	width = tempLineWidth,
+																	x = newDisplayLineGroup.x,
+																	y = newDisplayLineGroup.y,
+																	font=settings.font,
+																	fontSize = settings.size,
+																	align = textAlignmentForRender,
+																	color = settings.color,
+																	lineHeight = lineHeight,
+																	lineY = lineY,
+																	currentSpaceBefore = currentSpaceBefore,
+																	xOffset = xOffset,
+																})
+													end
+
+													-- Update cache chunk index counter
+													cachedChunkIndex = cachedChunkIndex + 1
+
+
 
 													lineCount = lineCount + 1
 
@@ -1635,7 +1811,7 @@ end
 													-- Otherwise, make a whole new line from it. Not sure how that would help.
 													wordlen = 0
 													if (textwrapIsCached) then
-														wordlen = cachedChunk.width[cachedChunkLine]
+														wordlen = cachedChunk.width[cachedChunkIndex]
 													elseif ( word ~= nil ) then
 														wordlen = strlen(word) * (settings.size * fontInfo.maxCharWidth)
 														
@@ -1673,9 +1849,13 @@ end
 														--yAdjustment = (settings.size * fontInfo.ascent )- newDisplayLineGroup.height
 														yAdjustment = ( (settings.size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLineGroup.height
 													end
-												    else
+
+
+
+
+												else
+
 													--longword = true
-													
 													renderTextFromMargin = true
 													currentXOffset = 0
 													lineY = lineY + currentLineHeight
@@ -1690,7 +1870,6 @@ end
 
 
 												if (textwrapIsCached or (not longword and wordlen <= currentWidth * widthCorrection) ) then
-
 													if (textwrapIsCached) then
 														currentLine = word
 													else
@@ -1707,23 +1886,25 @@ end
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 
+													word = trimByAlignment(word)
+
 													if (textwrapIsCached) then
 														currentLine = word
-													else
-														cachedChunk.text[cachedChunkLine] = word
-														cachedChunk.width[cachedChunkLine] = wordlen
+--													else
+--														cachedChunk.text[cachedChunkIndex] = word
+--														cachedChunk.width[cachedChunkIndex] = wordlen
 													end
-													cachedChunkLine = cachedChunkLine + 1
+													--cachedChunkIndex = cachedChunkIndex + 1
 
 --print ("B")
 if (testing) then
-print ()
-print ("----------------------------")
-print ("B: render a word: "..word)
-print ("\nrenderTextFromMargin reset to TRUE.")
-print ("isFirstLine", isFirstLine)
-print ("   newDisplayLineGroup.y",lineY + baselineAdjustment, baselineAdjustment)
-print ("leftIndent + currentFirstLineIndent + xOffset", settings.leftIndent, settings.currentFirstLineIndent, xOffset)
+	print ()
+	print ("----------------------------")
+	print ("B: render a word: "..word)
+	print ("\nrenderTextFromMargin reset to TRUE.")
+	print ("isFirstLine", isFirstLine)
+	print ("   newDisplayLineGroup.y",lineY + baselineAdjustment, baselineAdjustment)
+	print ("leftIndent + currentFirstLineIndent + xOffset", settings.leftIndent, settings.currentFirstLineIndent, xOffset)
 end
 
 													if (isFirstLine) then
@@ -1753,8 +1934,6 @@ end
 													local newDisplayLineGroup = display.newGroup()
 													--newDisplayLineGroup.anchorChildren = true
 													
-													word = trimByAlignment(word)
-
 													local newDisplayLineText = display.newText({
 														parent = newDisplayLineGroup,
 														text = word,
@@ -1785,6 +1964,29 @@ end
 													-- goes through the white spaces around letter strokes!
 													createLinkingBox(newDisplayLineGroup, newDisplayLineText, textDisplayReferencePoint, currentLine, {250,0,250,30} )
 
+
+													-- CACHE this line
+													if (not textwrapIsCached) then
+														updateCachedChunk (cachedChunk, { 
+																	index = cachedChunkIndex, 
+																	text = word,
+																	width = tempLineWidth,
+																	x = newDisplayLineGroup.x,
+																	y = newDisplayLineGroup.y,
+																	font=settings.font,
+																	fontSize = settings.size,
+																	align = textAlignmentForRender,
+																	color = settings.color,
+																	lineHeight = lineHeight,
+																	lineY = lineY,
+																	currentSpaceBefore = currentSpaceBefore,
+																	xOffset = xOffset,
+																})
+													end
+													
+													cachedChunkIndex = cachedChunkIndex + 1
+
+
 													-- This is a line too long to fit,
 													-- so the next line surely must be the beginning
 													-- a new line. We know nothing can continue on this line because we've filled it up.
@@ -1811,12 +2013,6 @@ end
 
 											end
 										end
-
-										if (not textwrapIsCached) then
-											display.remove(tempDisplayLineTxt);
-											tempDisplayLineTxt=nil;
-										end
-
 										shortword = ""
 									end
 
@@ -1828,8 +2024,6 @@ end
 							---------------------------------------------
 							-- end for
 							---------------------------------------------
-
-
 
 
 							-- Allow for lines with beginning spaces, for positioning
@@ -1894,11 +2088,11 @@ end
 								end
 
 								-- We have the current line from the code above if this is not cached text.
-								if (not textwrapIsCached) then
-									cachedChunk.text[cachedChunkLine] = currentLine
-									cachedChunk.width[cachedChunkLine] = currentWidth
-								end
-								cachedChunkLine = cachedChunkLine + 1
+--								if (not textwrapIsCached) then
+--									cachedChunk.text[cachedChunkIndex] = currentLine
+--									cachedChunk.width[cachedChunkIndex] = currentWidth
+--								end
+--								cachedChunkIndex = cachedChunkIndex + 1
 
 
 								if (testing) then
@@ -1917,7 +2111,6 @@ end
 								--newDisplayLineGroup.anchorChildren = true
 								
 								currentLine = trimByAlignment(currentLine)
-
 								local newDisplayLineText = display.newText({
 									parent = newDisplayLineGroup,
 									text = currentLine,
@@ -1948,6 +2141,30 @@ end
 								-- currentXOffset value so the next text starts in the right column.
 								setCurrentXOffset(newDisplayLineText, xOffset)
 
+								-- CACHE this line
+								if (not textwrapIsCached) then
+									updateCachedChunk (cachedChunk, { 
+												index = cachedChunkIndex, 
+												text = currentLine,
+												width = tempLineWidth,
+												x = newDisplayLineGroup.x,
+												y = newDisplayLineGroup.y,
+												font=settings.font,
+												fontSize = settings.size,
+												align = textAlignmentForRender,
+												color = settings.color,
+												lineHeight = lineHeight,
+												lineY = lineY,
+												currentSpaceBefore = currentSpaceBefore,
+												xOffset = xOffset,
+											})
+								end
+								
+								cachedChunkIndex = cachedChunkIndex + 1
+
+
+
+
 								-- Save the current line if we started at the margin
 								-- So the next line, if it has to, can start where this one ends.
 								prevTextInLine = prevTextInLine .. currentLine
@@ -1965,10 +2182,14 @@ end
 								currentLine = ""
 
 							end
-
-							cache[cacheChunkCtr] = cachedChunk
-							cacheChunkCtr = cacheChunkCtr + 1
+							
+							if (not textwrapIsCached) then
+								cache[cacheIndex] = cachedChunk
+							end
+							cacheIndex = cacheIndex + 1
 							return result
+							
+end
 
 						end -- renderParsedElement()
 
@@ -2082,7 +2303,6 @@ end
 
 
 					--endOfLine = false
-
 					for n, element in ipairs(parsedText) do
 						--local styleSettings = {}
 						if (type(element) == "table") then

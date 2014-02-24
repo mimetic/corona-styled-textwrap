@@ -22,11 +22,13 @@
 -- USEFUL FUNCTIONS.
 -- ===================
 
-module(..., package.seeall)
+local FUNX = {}
+
 
 -- Requires json library
-local json = require("json")
-local lfs = require "lfs"
+local json = require ( "json" )
+local lfs = require ( "lfs" )
+local widget = require ("widget")
 
 -- Used by tellUser...the handler for the timed message
 local timedMessage = nil
@@ -49,12 +51,88 @@ local gmatch = string.gmatch
 local find = string.find
 local gfind = string.gfind
 
------------------
+-- ALPHA VALUES, can change for RGB or HDR systems
+local OPAQUE = 255
+local TRANSPARENT = 0
+
+
+
+
+
+
+
+-- -------------------------------------------------------------
+-- GRAPHICS 2.0 POSITIONING
+-- ------------------------------------------------------------
+
+-----------
+-- Shortcut to set x,y to 0,0
+local function toZero(o)
+	o.x, o.y  = 0,0
+end
+
+-----------
+-- Shortcut to set anchors to top-left
+local function anchorTopLeft(o)
+	o.anchorX, o.anchorY = 0,0
+end
+
+-----------
+-- Shortcut to set anchors to top-left
+local function anchorCenter(o)
+	o.anchorX, o.anchorY = 0.5, 0.5
+end
+
+-----------
+-- Shortcut to set anchors to top-left and x,y to 0,0
+local function anchorTopLeftZero(o)
+	o.anchorX, o.anchorY = 0,0
+	o.x, o.y  = 0,0
+end
+
+-----------
+-- Shortcut to set anchors to center and x,y to 0,0
+local function anchorCenterZero(o)
+	o.anchorX, o.anchorY = 0.5, 0.5
+	o.x, o.y  = 0,0
+end
+
+-----------
+-- Shortcut to set anchors to top-left and x,y to 0,0
+local function anchorBottomRightZero(o)
+	o.anchorX, o.anchorY = 1,1
+	o.x, o.y  = 0,0
+end
+
+-- Add an invisible positioning rectangle for a group
+local function addPosRect(g, vis, c)
+	local r = display.newRect(g, 0,0,10,10)
+	r.isVisible = vis
+	c = c or {250,0,0,100}
+	r:setFillColor(unpack(c))
+	anchorTopLeftZero(r)
+	return g
+end
+
+
+
+local function centerInParent(g)
+	anchorCenter(g)
+	g.x = g.parent.width/2
+	g.y = g.parent.height/2
+return g
+end
+
+
+
+
+
+-- ------------------------------------------------------------
 -- DEBUGGING Timer
------------------
+-- ------------------------------------------------------------
 local firstTime = system.getTimer()
 local lastTimePassed = system.getTimer()
-function timePassed(msg)
+local function timePassed(msg)
 	local t2 = system.getTimer()
 	local t = t2 - lastTimePassed
 	lastTimePassed = t2
@@ -67,7 +145,7 @@ end
 -----------------
 -- 'n' is the call stack level to show
 -- '2' will show the calling function
-function printFuncName(n)
+local function printFuncName(n)
 	n = n or 2
 	local info = debug.getinfo(n, "Snl")
 	if info.what == "C" then   -- is a C function?
@@ -78,19 +156,19 @@ function printFuncName(n)
 end
 
 
-function isTable(t)
+local function isTable(t)
 	return (type(t) == "table")
 end
 
 
 -----------------
 -- Fails for negatives, apparently
-function round2(num, idp)
+local function round2(num, idp)
 	local mult = 10^(idp or 0)
 	return floor(num * mult + 0.5) / mult
 end
 
-function round(num, idp)
+local function round(num, idp)
   return tonumber(string.format("%." .. (idp or 0) .. "f", num))
 end
 
@@ -98,7 +176,7 @@ end
 -- Given a value from an XML element, it could be x=y or x.value=y
 -- Return y in either case.
 -- If asNil is true, then if the value is "" or nil, return nil
-function getValue(x,asNil)
+local function getValue(x,asNil)
 	local r
 	if (type(x) == "table") then
 		if (x.value) then
@@ -120,7 +198,7 @@ end
 
 --------------
 -- unescape/escape a hex string
-function unescape (s)
+local function unescape (s)
 	if (not s) then
 		return ""
 	end
@@ -131,7 +209,7 @@ function unescape (s)
 	return s
 end
 
-function escape(s)
+local function escape(s)
 	s = string.gsub(s, "([&=+%c])", function(c)return string.format("%%%02X", string.byte(c))end)
 	s = string.gsub(s, " ", "+")
 	return s
@@ -139,7 +217,7 @@ end
 
 --=========
 --- Remove a value from a table. The table is searched and the value removed from it.
-function removeFromTable(t,obj)
+local function removeFromTable(t,obj)
 	for i,o in pairs(t) do
 		if (o == obj) then
 			t[i] = nil
@@ -153,7 +231,7 @@ end
 
 -----------------
 -- Table is empty?
-function tableIsEmpty(t)
+local function tableIsEmpty(t)
 	if (t and type(t) == "table" ) then
 		if (next(t) == nil) then
 			return true
@@ -164,7 +242,7 @@ end
 
 -----------------
 -- Length of a table, i.e. number elements in it.
-function tablelength (t)
+local function tablelength (t)
 	if (type(t) ~= "table") then
 		return 0
 	end
@@ -177,7 +255,7 @@ end
 
 
 -- Delete fields of the form {{x}} in the string s
-function removeFields (s)
+local function removeFields (s)
 	if (not s) then return nil end
 	local r = gfind(s,"%{%{.-%}%}")
 	local res = s
@@ -188,7 +266,7 @@ function removeFields (s)
 end
 
 -- Delete fields of the form {x} in the string s
-function removeFieldsSingle (s)
+local function removeFieldsSingle (s)
 	if (not s) then return nil end
 	local r = gfind(s,"%b{}")
 	local res = s
@@ -203,7 +281,7 @@ end
 -- @param t Table with keys that might need escaping
 -- @return	res	Key:value pairs: original key => clean key
 -- e.g. { "icon-1" = "myicon.jpg" } ===> { "icon-1" = "icon%-1" }
-function getEscapedKeysForGsub(t)
+local function getEscapedKeysForGsub(t)
 	local gsub = string.gsub
 	-- Chars to escape: ( ) . % + - * ? [ ^ $
 	local res = {}
@@ -221,7 +299,7 @@ end
 -- @param t	Table of key:value pairs to use for replacement (search for key)
 -- @param escapeTheKeys	if TRUE then escape the keys of the subsitutions table (t), if a table then use that table as the escaped keys table
 -- @return s	string with replacements
-function substitutions (s, t, escapeTheKeys)
+local function substitutions (s, t, escapeTheKeys)
 	local gsub = string.gsub
 
 	if (not s or not t or t=={}) then
@@ -254,7 +332,7 @@ end
 -- Substitute for {x} with table.x from a table.
 -- There can be multiple fields in the string, s.
 -- Returns the string with the fields filled in.
-function OLD_substitutionsSLOWER (s, t)
+local function OLD_substitutionsSLOWER (s, t)
 	if (not s or not t or t=={}) then
 		--print ("funx.substitutions: No Values passed!")
 		return s
@@ -282,7 +360,7 @@ end
 -- nested tables.
 -- @param t Table in which to substitute
 -- @param subs table Table of substitutions
-function tableSubstitutions(t, subs, escapeTheKeys)
+local function tableSubstitutions(t, subs, escapeTheKeys)
 	if (type(t) ~= "table") then
 		return t
 	end
@@ -319,7 +397,7 @@ end
 --===========
 --- Remove elements that contain unresolved {{}} codes.
 -- @param t Table in which to substitute
-function tableRemoveUnusedCodedElements(t )
+local function tableRemoveUnusedCodedElements(t )
 	if (type(t) ~= "table") then
 		return t
 	end
@@ -342,7 +420,7 @@ end
 
 -- hasFieldCodes(s)
 -- Return true/false if the string has field codes, i.e. {x} inside it
-function hasFieldCodes(s)
+local function hasFieldCodes(s)
 	if (type(s) ~= "string") then
 		return false
 	end
@@ -359,7 +437,7 @@ end
 
 -- hasFieldCodes(s)
 -- Return true/false if the string has field codes, i.e. {x} inside it
-function hasFieldCodesSingle(s)
+local function hasFieldCodesSingle(s)
 	if (type(s) ~= "string") then
 		return false
 	end
@@ -375,7 +453,7 @@ end
 
 -- Get element name from string.
 -- If the string is {{xxx}} then the field name is "xxx"
-function getElementName (s)
+local function getElementName (s)
 	local r = gfind(s,"%{%{(.-)%}%}")
 	local res = "RESULT: "..s
 	for w in r do
@@ -387,7 +465,7 @@ end
 
 
 -- Dump an XML table
-function dump(_class, no_func, depth)
+local function dump(_class, no_func, depth)
 	if (not _class) then
 		print ("dump: not a class.");
 		return;
@@ -443,7 +521,7 @@ end
 
 --------------------------------------------------------
 -- tableCopy
-function tableCopy(object)
+local function tableCopy(object)
 	local lookup_table = {}
 	local function _copy(object)
 		if type(object) ~= "table" then
@@ -467,7 +545,7 @@ end
 -- recursively
 -- Only act on strings
 -- If flag set, return nil for an empty string
-function trim(s, returnNil)
+local function trim(s, returnNil)
 	if (s) then
 		if (type(s) == "table") then
 			for i,v in ipairs(s) do
@@ -489,7 +567,7 @@ end
 -- Remove white space from the start of a string, OR table of strings recursively
 -- Only act on strings
 -- If flag set, return nil for an empty string
-function ltrim(s, returnNil)
+local function ltrim(s, returnNil)
 	if (s) then
 		if (type(s) == "table") then
 			for i,v in ipairs(s) do
@@ -511,7 +589,7 @@ end
 -- Remove white space from the end of a string, OR table of strings recursively
 -- Only act on strings
 -- If flag set, return nil for an empty string
-function rtrim(s, returnNil)
+local function rtrim(s, returnNil)
 	if (s) then
 		if (type(s) == "table") then
 			for i,v in ipairs(s) do
@@ -532,7 +610,7 @@ end
 --------------------------------------------------------
 -- table merge
 -- Overwrite elements in the first table with the second table!
-function tableMerge(t1, t2)
+local function tableMerge(t1, t2)
 	if (type(t1) ~= "table") then
 		return t2
 	end
@@ -557,6 +635,193 @@ end
 
 
 
+local function split(str, pat, doTrim)
+	pat = pat or ","
+	if (not str) then
+		return nil
+	end
+	str = tostring(str)
+	local t = {}
+	local fpat = "(.-)" .. pat
+	local last_end = 1
+	local s, e, cap = str:find(fpat, 1)
+	while s do
+		if s ~= 1 or cap ~= "" then
+		if doTrim then cap = trim(cap) end
+		table.insert(t,cap)
+		end
+		last_end = e+1
+		s, e, cap = str:find(fpat, last_end)
+	end
+	if last_end <= #str then
+		cap = str:sub(last_end)
+		if doTrim then cap = trim(cap) end
+		table.insert(t,cap)
+	end
+	return t
+end
+
+
+
+
+-------------------------------------------------
+--- GET DEVICE SCALE FACTOR FOR RETINA RESIZING
+--1 = no need to change anything
+--2 = multiply by 2
+-- examples:
+--	local scalingRatio = scaleFactorForRetina()
+--	local scalesuffix = "@"..scalingRatio.."x"
+--
+--	local scalingRatio = 1/scaleFactorForRetina()
+--	width = width/scalingRatio
+--	height = height/scalingRatio
+
+-------------------------------------------------
+local function scaleFactorForRetina()
+	local deviceWidth = ( display.contentWidth - (display.screenOriginX * 2) ) / display.contentScaleX
+	local scaleFactor = math.floor( deviceWidth / display.contentWidth )
+	return scaleFactor
+end
+
+
+-------------------------------------------------
+-- CHECK IMAGE DIMENSION & SCALE ACCORDINGLY
+-------------------------------------------------
+local function checkScale(p)
+	if p.width > viewableScreenW or p.height > viewableScreenH then
+		if p.width/viewableScreenW > p.height/viewableScreenH then
+				p.xScale = viewableScreenW/p.width
+				p.yScale = viewableScreenW/p.width
+		else
+				p.xScale = viewableScreenH/p.height
+				p.yScale = viewableScreenH/p.height
+		end
+	end
+end
+
+-------------------------------------------------
+-- RESCALE AN IMAGE THAT WAS DESIGNED FOR THE IPAD (1024X768) FOR THE CURRENT PLATFORM
+-- Assuming the graphic was made for a different platform
+-- this resizes it
+-------------------------------------------------
+local function resizeFromIpad(p)
+	local currentR = viewableScreenW/viewableScreenH
+	local ipadR = 1024/768
+	local r
+
+	if (currentR > ipadR) then
+		-- use ration based on different heights
+		r = viewableScreenH / 768
+	else
+		r = viewableScreenW / 1024
+	end
+	if (r ~= 1) then
+		p:scale(r,r)
+		--print ("Resize image by (viewableScreenW/1024) = "..r)
+	end
+
+
+end
+
+
+-------------------------------------------------
+-- RESCALE COORDINATES THAT WERE DESIGNED FOR THE IPAD (1024X768) FOR THE CURRENT PLATFORM
+-- Used to reposition coordinates that were set up for the iPad, e.g. x,y positions
+-- If the screen is a different shape, pad the x to make up for it
+-- iPad is 1024/768 = 133/100 (1.33)
+-- CONVERT results to integer (math.floor)
+local function rescaleFromIpad(x,y)
+
+	-- Do nothing if this is an iPad screen!
+	if ( (screenW == 1024 and screenH == 768) or (screenW == 768 and screenH == 1024) )then
+		return x,y
+	end
+
+	if (x == nil) then
+		return 0,0
+	end
+	--print ("viewableScreenW="..viewableScreenW..", viewableScreenH="..viewableScreenH)
+
+	local currentR = viewableScreenW/viewableScreenH
+	local ipadR = 1024/768
+	local fixedH = 768
+	local fixedW = 1024
+
+
+	if (currentR > 1) then
+		ipadR = 1/ipadR
+		fixedH = 1024
+		fixedW = 768
+	end
+	local r
+
+	if (currentR > ipadR) then
+		-- use ration based on different heights
+		r = viewableScreenH / fixedH
+	else
+		r = viewableScreenW / fixedW
+	end
+
+	-- Pad for different shape
+	local screenR = floor((viewableScreenW / viewableScreenH) * 100 )/100
+	local px = 0
+	--print ("screenR="..screenR)
+	if (y and (screenR ~= floor((ipadR)*100)/100)) then
+		px = floor((viewableScreenW - (viewableScreenH * ipadR))/2)
+	end
+	x = floor((x * r) + (px))
+	--print ("Padding x="..px)
+	if (y ~= nil) then
+		y = floor(y * r)
+		return x,y
+	else
+		return x
+	end
+end
+
+
+-- If the value is a percentage, multiply by the 2nd param, else return the 1st param
+-- value is rounded to nearest integer, UNLESS the 2nd param is less than 1
+-- or noRound = true
+-- If x is nil, but y is not, then return the y (i.e. assume 100%)
+local function applyPercent (x,y,noRound)
+	if (x == nil and y == nil) then
+		return nil
+	end
+
+	if (x == nil and y ~= nil) then
+		return tonumber(y)
+	end
+
+	x = x or 0
+	y = y or 0
+	local v = string.match(trim(x), "(.+)%%$")
+	if v then
+		v = (v / 100) * y
+		if ((not noRound) and (y>1)) then
+			v = math.floor(v+0.5)
+		end
+	else
+		v = x
+	end
+	return tonumber(v)
+end
+
+-- ===========
+--- Get a percentage of the screen height
+-- @param y
+-- @param noRound If false, value NOT rounded to nearest integer
+local function percentOfScreenHeight (y,noRound)
+	return applyPercent (y, screenH, noRound)
+end
+
+-- ===========
+--- Get a percentage of the screen height
+-- @param y
+-- @param noRound If false, value NOT rounded to nearest integer
+local function percentOfScreenWidth (x,noRound)
+	return applyPercent (x, screenW, noRound)
+end
 
 --------------------------------------------------------
 -- File Exists
@@ -564,7 +829,7 @@ end
 -- not system.DocumentsDirectory
 --------------------------------------------------------
 
-function fileExists(f,d)
+local function fileExists(f,d)
 	if (f) then
 		d = d or system.ResourceDirectory
 		local filePath = system.pathForFile( f, d )
@@ -596,7 +861,7 @@ end
 ----------------------
 -- Save/load functions
 
-function saveData(filePath, text)
+local function saveData(filePath, text)
 	--local levelseq = table.concat( levelArray, "-" )
 	local file = io.open( filePath, "w" )
 	if (file) then
@@ -609,7 +874,7 @@ function saveData(filePath, text)
 	end
 end
 
-function loadData(filePath)
+local function loadData(filePath)
 	local t = nil
 	--local levelseq = table.concat( levelArray, "-" )
 	local file = io.open( filePath, "r" )
@@ -622,7 +887,7 @@ function loadData(filePath)
 	return t
 end
 
-function saveTableToFile(filePath, dataTable)
+local function saveTableToFile(filePath, dataTable)
 
 	--local levelseq = table.concat( levelArray, "-" )
 	file = io.open( filePath, "w" )
@@ -637,7 +902,7 @@ end
 
 -- Load a table form a text file.
 -- The table is stored as comma-separated name=value pairs.
-function loadTableFromFile(filePath, s)
+local function loadTableFromFile(filePath, s)
 	local substring = string.sub
 
 	if (not filePath) then
@@ -683,7 +948,7 @@ function loadTableFromFile(filePath, s)
 	end
 end
 
-function saveTable(t, filename, path)
+local function saveTable(t, filename, path)
 	if (not t or not filename) then
 		return true
 	end
@@ -696,7 +961,7 @@ function saveTable(t, filename, path)
 	return saveData(filePath, json)
 end
 
-function loadTable(filename, path)
+local function loadTable(filename, path)
 	path = path or system.DocumentsDirectory
 	if (fileExists(filename,path)) then
 		local filePath = system.pathForFile( filename, path )
@@ -718,7 +983,7 @@ end
 ------------------------------------------------------------------------
 -- Image loading
 ------------------------------------------------------------------------
-function getScaledFilename(filename, d)
+local function getScaledFilename(filename, d)
 	local scalingRatio = scaleFactorForRetina()
 
 	if (scalingRatio <= 1) then
@@ -758,7 +1023,7 @@ if (not ImageInfoList) then
 	ImageInfoList = loadTable("_user/images_info.json", system.ResourceDirectory) or {}
 end
 
-function getImageSize(f,d)
+local function getImageSize(f,d)
 	d = d or system.ResourceDirectory
 
 	-- load info table, if not loaded
@@ -788,7 +1053,7 @@ end
 -- An attempt to load images async, rather than force everything to wait.
 -- SO FAR, IT DOESN'T QUITE WORK! IMAGES GET LOADED, BUT DON'T
 -- END UP IN THE RIGHT PLACES.
-function getDisplayObjectParams(i)
+local function getDisplayObjectParams(i)
 	-- Save the useful values from the target we are replacing
 	local params = {
 		alpha = i.alpha,
@@ -817,7 +1082,7 @@ function getDisplayObjectParams(i)
 end
 
 
-function lazyLoad(target,f,w,h)
+local function lazyLoad(target,f,w,h)
 
 	local params, g
 	if (target) then
@@ -862,7 +1127,7 @@ end
 -- replaceWildcard ("*/images/pic.jpg", "mydir", "?")
 --------------------------------------------------------
 
-function replaceWildcard(text, v, p)
+local function replaceWildcard(text, v, p)
 --print ("funx.replaceWildcard", text, v, p)
 	if (text and v) then
 		p = p or "*"
@@ -881,7 +1146,7 @@ end
 -- If there is a "*" in the filename, the file MUST be a user file, found in the CachesDirectory.
 -- DEPRECATED: ALWAYS USE CORONA METHOD: method: true = use my method, false means use Corona method
 --------------------------------------------------------
-function loadImageFile(filename, filepath, whichSystemDirectory)
+local function loadImageFile(filename, filepath, whichSystemDirectory)
 	local scalingRatio = 1
 	local scaleFraction = 1
 	local scalesuffix = ""
@@ -960,7 +1225,7 @@ function loadImageFile(filename, filepath, whichSystemDirectory)
 		i:setReferencePoint(display.CenterReferencePoint)
 		i.x = 0
 		i.y = 0
-		return i, scaleFraction
+		return i, false
 	end
 end
 
@@ -969,7 +1234,7 @@ end
 -- Verify Net Connection OR QUIT!
 -- WARNING, THIS QUITS THE APP IF NO CONNECTION!!!
 --------------------------------------------------------
-function verifyNetConnectionOrQuit()
+local function verifyNetConnectionOrQuit()
 	local http = require("socket.http")
 	local ltn12 = require("ltn12")
 
@@ -991,7 +1256,7 @@ end
 -- url: a server to check (use http://...)
 -- showActivity: Turn off the activity indicator (must be turned on before starting)
 --------------------------------------------------------
-function hasNetConnection(url,showActivity)
+local function hasNetConnection(url,showActivity)
 	local socket = require("socket")
 	local test = socket.tcp()
 	test:settimeout(1, 't') -- timeout 1 sec
@@ -1017,7 +1282,7 @@ end
 -- url: a server to check (use http://...)
 -- showActivity: Turn off the activity indicator (must be turned on before starting)
 --------------------------------------------------------
-function canConnectWithServer(url, showActivity, callback, testing)
+local function canConnectWithServer(url, showActivity, callback, testing)
 
 			local function MyNetworkReachabilityListener(event)
 				if (testing) then
@@ -1063,166 +1328,6 @@ function canConnectWithServer(url, showActivity, callback, testing)
 end
 
 
-
--------------------------------------------------
---- GET DEVICE SCALE FACTOR FOR RETINA RESIZING
---1 = no need to change anything
---2 = multiply by 2
--- examples:
---	local scalingRatio = scaleFactorForRetina()
---	local scalesuffix = "@"..scalingRatio.."x"
---
---	local scalingRatio = 1/scaleFactorForRetina()
---	width = width/scalingRatio
---	height = height/scalingRatio
-
--------------------------------------------------
-function scaleFactorForRetina()
-	local deviceWidth = ( display.contentWidth - (display.screenOriginX * 2) ) / display.contentScaleX
-	local scaleFactor = math.floor( deviceWidth / display.contentWidth )
-	return scaleFactor
-end
-
-
--------------------------------------------------
--- CHECK IMAGE DIMENSION & SCALE ACCORDINGLY
--------------------------------------------------
-function checkScale(p)
-	if p.width > viewableScreenW or p.height > viewableScreenH then
-		if p.width/viewableScreenW > p.height/viewableScreenH then
-				p.xScale = viewableScreenW/p.width
-				p.yScale = viewableScreenW/p.width
-		else
-				p.xScale = viewableScreenH/p.height
-				p.yScale = viewableScreenH/p.height
-		end
-	end
-end
-
--------------------------------------------------
--- RESCALE AN IMAGE THAT WAS DESIGNED FOR THE IPAD (1024X768) FOR THE CURRENT PLATFORM
--- Assuming the graphic was made for a different platform
--- this resizes it
--------------------------------------------------
-function resizeFromIpad(p)
-	local currentR = viewableScreenW/viewableScreenH
-	local ipadR = 1024/768
-	local r
-
-	if (currentR > ipadR) then
-		-- use ration based on different heights
-		r = viewableScreenH / 768
-	else
-		r = viewableScreenW / 1024
-	end
-	if (r ~= 1) then
-		p:scale(r,r)
-		--print ("Resize image by (viewableScreenW/1024) = "..r)
-	end
-
-
-end
-
-
--------------------------------------------------
--- RESCALE COORDINATES THAT WERE DESIGNED FOR THE IPAD (1024X768) FOR THE CURRENT PLATFORM
--- Used to reposition coordinates that were set up for the iPad, e.g. x,y positions
--- If the screen is a different shape, pad the x to make up for it
--- iPad is 1024/768 = 133/100 (1.33)
--- CONVERT results to integer (math.floor)
-function rescaleFromIpad(x,y)
-
-	-- Do nothing if this is an iPad screen!
-	if ( (screenW == 1024 and screenH == 768) or (screenW == 768 and screenH == 1024) )then
-		return x,y
-	end
-
-	if (x == nil) then
-		return 0,0
-	end
-	--print ("viewableScreenW="..viewableScreenW..", viewableScreenH="..viewableScreenH)
-
-	local currentR = viewableScreenW/viewableScreenH
-	local ipadR = 1024/768
-	local fixedH = 768
-	local fixedW = 1024
-
-
-	if (currentR > 1) then
-		ipadR = 1/ipadR
-		fixedH = 1024
-		fixedW = 768
-	end
-	local r
-
-	if (currentR > ipadR) then
-		-- use ration based on different heights
-		r = viewableScreenH / fixedH
-	else
-		r = viewableScreenW / fixedW
-	end
-
-	-- Pad for different shape
-	local screenR = floor((viewableScreenW / viewableScreenH) * 100 )/100
-	local px = 0
-	--print ("screenR="..screenR)
-	if (y and (screenR ~= floor((ipadR)*100)/100)) then
-		px = floor((viewableScreenW - (viewableScreenH * ipadR))/2)
-	end
-	x = floor((x * r) + (px))
-	--print ("Padding x="..px)
-	if (y ~= nil) then
-		y = floor(y * r)
-		return x,y
-	else
-		return x
-	end
-end
-
-
--- If the value is a percentage, multiply by the 2nd param, else return the 1st param
--- value is rounded to nearest integer, UNLESS the 2nd param is less than 1
--- or noRound = true
--- If x is nil, but y is not, then return the y (i.e. assume 100%)
-function applyPercent (x,y,noRound)
-	if (x == nil and y == nil) then
-		return nil
-	end
-
-	if (x == nil and y ~= nil) then
-		return tonumber(y)
-	end
-
-	x = x or 0
-	y = y or 0
-	local v = string.match(trim(x), "(.+)%%$")
-	if v then
-		v = (v / 100) * y
-		if ((not noRound) and (y>1)) then
-			v = math.floor(v+0.5)
-		end
-	else
-		v = x
-	end
-	return tonumber(v)
-end
-
--- ===========
---- Get a percentage of the screen height
--- @param y
--- @param noRound If false, value NOT rounded to nearest integer
-function percentOfScreenHeight (y,noRound)
-	return applyPercent (y, screenH, noRound)
-end
-
--- ===========
---- Get a percentage of the screen height
--- @param y
--- @param noRound If false, value NOT rounded to nearest integer
-function percentOfScreenWidth (x,noRound)
-	return applyPercent (x, screenW, noRound)
-end
-
 -------------------------------------------------
 -- Darken the screen
 -- by drawing a dark opaque rectangle over it.
@@ -1233,9 +1338,9 @@ end
 -- factor, to adjust the screen image.
 -- locked: default is no lock, if true then lock the screen from touches
 -------------------------------------------------
-function dimScreen(time, color, opacity, scaling, locked)
+local function dimScreen(transitionTime, color, opacity, scaling, locked)
 
-	time = time or 300
+	transitionTime = transitionTime or 300
 	color = color or "55,55,55"
 	opacity = applyPercent(opacity,1) or 190/255
 	scaling = scaling or 1
@@ -1245,27 +1350,27 @@ function dimScreen(time, color, opacity, scaling, locked)
 	bkgdrect:setFillColor( c[1], c[2], c[3])
 	bkgdrect.alpha = 0
 	bkgdrect:scale(1/scaling, 1/scaling)
-	transition.to (bkgdrect, {alpha=opacity, time=time } )
+	transition.to (bkgdrect, {alpha=opacity, time=transitionTime } )
 
 	bkgdrect:addEventListener("touch", function() return locked end )
 
 	return bkgdrect
 end
 
-function undimScreen(handle, time, f)
+local function undimScreen(handle, transitionTime, f)
 		local function killme()
 			display.remove(handle)
 			handle = nil
-			if (type(time) == "function") then
-				time()
+			if (type(transitionTime) == "function") then
+				transitionTime()
 			elseif (type(f) == "function") then
 				f()
 			end
 		end
 
 	local t
-	if (type(time) == "number") then
-		t = time
+	if (type(transitionTime) == "number") then
+		t = transitionTime
 	else
 		t = 300
 	end
@@ -1280,18 +1385,18 @@ end
 -- If the first param is a table, then we assume all params are in that table, IN ORDER!!!,
 -- starting with filename, e.g. { "filename.jpg", "white", 1000, true}
 -------------------------------------------------
-function popup(filename, color, bkgdAlpha, time, cancelOnTouch)
-
-	local ui = require ("ui")
+local function popup(filename, color, bkgdAlpha, transitionTime, cancelOnTouch)
 
 	local mainImage
 	local pgroup = display.newGroup()
+	pgroup.anchorChildren = true
+	
 	local closing = false
 
 	if (type(filename) == "table") then
 		color = filename.color
 		bkgdAlpha = filename.bkgdAlpha
-		time = tonumber(filename.time)
+		transitionTime = tonumber(filename.time)
 		cancelOnTouch =	 filename.cancelOnTouch or false
 		filename = trim(filename.filename)
 	end
@@ -1305,8 +1410,8 @@ function popup(filename, color, bkgdAlpha, time, cancelOnTouch)
 
 	bkgdAlpha = applyPercent(bkgdAlpha,1) or 0.95
 
-	time = tonumber(time)
-	time = time or 300
+	transitionTime = tonumber(transitionTime)
+	transitionTime = transitionTime or 300
 
 	cancelOnTouch = cancelOnTouch or false
 
@@ -1323,7 +1428,7 @@ function popup(filename, color, bkgdAlpha, time, cancelOnTouch)
 
 	local function closeMe(event)
 		if (not closing and pgroup ~= nil) then
-			transition.to (pgroup, {alpha=0, time=time, onComplete=killme} )
+			transition.to (pgroup, {alpha=0, time=transitionTime, onComplete=killme} )
 			closing = true
 		end
 		return true
@@ -1363,18 +1468,16 @@ function popup(filename, color, bkgdAlpha, time, cancelOnTouch)
 	mainImage.x = midscreenX
 	mainImage.y = midscreenY
 
-	local closeButton = ui.newButton{
-		defaultSrc = "_ui/button-cancel-round.png",
-		overSrc = "_ui/button-cancel-round-over.png",
+	local closeButton = widget.newButton{
+		defaultFile = "_ui/button-cancel-round.png",
+		overFile = "_ui/button-cancel-round-over.png",
 		onRelease = closeMe,
 	}
 	pgroup:insert(closeButton)
-	closeButton:setReferencePoint(display.TopRightReferencePoint)
-	--closeButton.x = midscreenX + (bkgd.width/2) - closeButton.width
-	--closeButton.y = midscreenY - (bkgd.height)/2 + closeButton.height
-	-- allow 10 px for the shadow of the popup background
-	closeButton.x = midscreenX + (bkgdWidth/2) + 10
-	closeButton.y = midscreenY - (bkgdHeight)/2 - 10
+	anchorCenterZero(closeButton)
+	closeButton.x = (bkgd.width/2) - closeButton.width/4
+	closeButton.y = -(bkgd.height/2) + closeButton.height/4
+	closeButton:toFront()
 
 	pgroup.alpha = 0
 
@@ -1385,7 +1488,7 @@ function popup(filename, color, bkgdAlpha, time, cancelOnTouch)
 		pgroup:addEventListener( "touch", function() return true end )
 	end
 
-	transition.to (pgroup, {alpha=1, time=time } )
+	transition.to (pgroup, {alpha=1, time=transitionTime } )
 
 end
 
@@ -1397,32 +1500,32 @@ end
 -- If the first param is a table, then we assume all params are in that table, IN ORDER!!!,
 -- starting with filename, e.g. { "filename.jpg", "white", 1000, true}
 -------------------------------------------------
-function popupWebpage(targetURL, color, bkgdAlpha, time, netrequired, noNetMsg)
+local function popupWebpage(targetURL, color, bkgdAlpha, transitionTime, netrequired, noNetMsg)
 
 	noNetMsg = noNetMsg or "No Internet"
 
 	if (netrequired and not hasNetConnection() ) then
-		funx.tellUser(noNetMsg)
+		tellUser(noNetMsg)
 		return false
 	end
 
-	local ui = require ("ui")
-
 	local mainImage
 	local pgroup = display.newGroup()
+	anchorCenter(pgroup)
+	pgroup.x, pgroup.y = midscreenX, midscreenY
+	
 	local closing = false
-
 	if (type(targetURL) == "table") then
 		color = trim(targetURL[2])
 		bkgdAlpha = tonumber(targetURL[3])
-		time = tonumber(targetURL[4])
+		transitionTime = tonumber(targetURL[4])
 		targetURL = trim(targetURL[1])
 	end
 
 	color = color or "white"
 
 	bkgdAlpha = bkgdAlpha or 0.95
-	time = time or 300
+	transitionTime = transitionTime or 300
 
 	local function killme()
 		if (pgroup ~= nil) then
@@ -1437,7 +1540,7 @@ function popupWebpage(targetURL, color, bkgdAlpha, time, netrequired, noNetMsg)
 	local function closeMe(event)
 		if (not closing and pgroup ~= nil) then
 			native.cancelWebPopup()
-			transition.to (pgroup, {alpha=0, time=time, onComplete=killme} )
+			transition.to (pgroup, {alpha=0, time=transitionTime, onComplete=killme} )
 			closing = true
 		end
 		return true
@@ -1447,30 +1550,29 @@ function popupWebpage(targetURL, color, bkgdAlpha, time, netrequired, noNetMsg)
 	-- cover all rect, darken background
 	local bkgdrect = display.newRect(0,0,screenW,screenH)
 	pgroup:insert(bkgdrect)
+	anchorCenter(bkgdrect)
 	bkgdrect:setFillColor( 55, 55, 55, 190 )
 
 	-- background graphic for popup
 	local bkgd = display.newImage("_ui/popup-"..color..".png", true)
 	checkScale(bkgd)
 	pgroup:insert (bkgd)
-	bkgd:setReferencePoint(display.CenterReferencePoint)
-	bkgd.x = midscreenX
-	bkgd.y = midscreenY
+	anchorCenter(bkgdrect)
 	bkgd.alpha = bkgdAlpha
 
-	local closeButton = ui.newButton{
-		defaultSrc = "_ui/button-cancel-round.png",
-		overSrc = "_ui/button-cancel-round-over.png",
-		onRelease = closeMe,
+	local closeButton = widget.newButton {
+	    id = "close",
+	    defaultFile = "_ui/button-cancel-round.png",
+	    overFile = "_ui/button-cancel-round-over.png",
+	    onRelease = closeMe,
 	}
 	pgroup:insert(closeButton)
 	closeButton:setReferencePoint(display.TopRightReferencePoint)
-	--closeButton.x = midscreenX + (bkgd.width/2) - closeButton.width
-	--closeButton.y = midscreenY - (bkgd.height)/2 + closeButton.height
-	-- allow 10 px for the shadow of the popup background
-	closeButton.x = midscreenX + (bkgd.width/2) + 10
-	closeButton.y = midscreenY - (bkgd.height)/2 - 10
-
+	anchorCenterZero(closeButton)
+	closeButton.x = (bkgd.width/2) - closeButton.width/4
+	closeButton.y = -(bkgd.height/2) + closeButton.height/4
+	closeButton:toFront()
+	
 	pgroup.alpha = 0
 
 	-- Capture touch events and do nothing.
@@ -1491,8 +1593,8 @@ function popupWebpage(targetURL, color, bkgdAlpha, time, netrequired, noNetMsg)
 		}
 		native.showWebPopup(x, y, w, h, targetURL, options )
 	end
-	time = tonumber(time)
-	transition.to (pgroup, {alpha=1, time=time, onComplete=showMyWebPopup } )
+	transitionTime = tonumber(transitionTime)
+	transition.to (pgroup, {alpha=1, time=transitionTime, onComplete=showMyWebPopup } )
 end
 
 
@@ -1500,7 +1602,7 @@ end
 ------------------------------------------------------------------------
 -- OPEN a URL
 ------------------------------------------------------------------------
-function openURLWithConfirm(urlToOpen, title, msg)
+local function openURLWithConfirm(urlToOpen, title, msg)
 
 	-- Handler that gets notified when the alert closes
 	local function onComplete( event )
@@ -1523,13 +1625,14 @@ end
 
 
 ------------------------------------------------------------------------
--- SHADOW
+-- SHADOW - Image-based version for Graphics 1.0
 -- Build a drop shadow
 ------------------------------------------------------------------------
 
-function buildShadow(w,h)
+local function buildShadow1(w,h)
 	local ceil = math.ceil
 	local shadow = display.newGroup()
+	shadow.anchorChildren = true
 
 	--print ("buildShadow: ",w,h)
 
@@ -1655,6 +1758,42 @@ function buildShadow(w,h)
 
 end
 
+
+------------------------------------------------------------------------
+-- SHADOW - Filter Effects based using Graphics 2.0
+-- Build a drop shadow
+------------------------------------------------------------------------
+
+
+local function buildShadow(w,h,sw,opacity)
+
+	sw = sw or 20
+	local shadow = display.newSnapshot( w + 2*sw, h + 2*sw )
+	
+	opacity = opacity or OPAQUE
+	opacity = applyPercent( opacity, OPAQUE)
+
+	-- Start with a solid rect
+	local srect = display.newRect(0,0,w + 1*sw,h + 1*sw)
+	-- Alpha visually matches the graphic pieces. Probably we should use another graphic
+	srect:setFillColor( 0,0,0, opacity )
+	
+	shadow.group:insert(srect)
+	
+	shadow.fill.effect = "filter.blurGaussian"
+	shadow.fill.effect.horizontal.blurSize = sw
+	shadow.fill.effect.horizontal.sigma = 140
+	shadow.fill.effect.vertical.blurSize = sw
+	shadow.fill.effect.vertical.sigma = 140
+
+	--shadow.fill.effect = "filter.blur"
+
+	return shadow
+
+end
+
+
+
 ------------------------------------------------------------------------
 -- Functions to do on a system event,
 -- e.g. load or exit
@@ -1663,7 +1802,7 @@ end
 -- options.onAppExit = function for exit or suspend
 ------------------------------------------------------------------------
 
-function initSystemEventHandler(options)
+local function initSystemEventHandler(options)
 
 	---------------------
 	local function shouldResume()
@@ -1710,7 +1849,7 @@ end
 -- the reason this routine is needed is because lua does not
 -- have a sort indexed table function
 -- reverse : if set, sort reverse
-function table_sort(a, sortfield, reverse)
+local function table_sort(a, sortfield, reverse)
 	local new1 = {}
 	local new2 = {}
 	for k,v in pairs(a) do
@@ -1742,7 +1881,7 @@ As a more advanced solution, we can write an iterator that traverses a table fol
 		end
 ]]
 
-function pairsByKeys (t, f)
+local function pairsByKeys (t, f)
 	local a = {}
 	for n in pairs(t) do table.insert(a, n) end
 	table.sort(a, f)
@@ -1789,7 +1928,7 @@ Example:
 	t = table_multi_sort(t, {"publisherid", "title", "author" },{ true, false, false }, true  )
 
 --]]
-function table_multi_sort(a, sortfields, reverseSort, returnNumericArray)
+local function table_multi_sort(a, sortfields, reverseSort, returnNumericArray)
 
 	if ( (not reverseSort) or #reverseSort == 0) then
 		reverseSort = {}
@@ -1841,7 +1980,7 @@ end
 -- Order objects in a display group by the "layer" field of each object
 -- We can't use "z-index" cuz the hyphen doesn't work in XML.
 -- This allows for ordered layering.
-function zSort(myGroup)
+local function zSort(myGroup)
 
 	local n = myGroup.numChildren
 	local kids = {}
@@ -1873,7 +2012,7 @@ end
 
 --========================================================================
 -- get date parts for a given ISO 8601 date format (http://richard.warburton.it )
-function get_date_parts(date_str)
+local function get_date_parts(date_str)
 	if (date_str) then
 		_,_,y,m,d=string.find(date_str, "(%d+)-(%d+)-(%d+)")
 		return tonumber(y),tonumber(m),tonumber(d)
@@ -1885,7 +2024,7 @@ end
 
 -- This converts a unix time stamp in GMT time to current local Lua time.
 -- This is a string of the form, yyyy-mm-dd hh:mm:ss
-function datetime_to_unix_time(s)
+local function datetime_to_unix_time(s)
 	if (s) then
 		local p="(%d+)-(%d+)-(%d+) (%d+):(%d+):(%d+)"
 		local year,month,day,hour,min,sec=s:match(p)
@@ -1899,13 +2038,13 @@ function datetime_to_unix_time(s)
 end
 
 --====================================================
-function getmonth(month)
+local function getmonth(month)
 	local months = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
 	return months[tonumber(month)]
 end
 
 --====================================================
-function getday_posfix(day)
+local function getday_posfix(day)
 local idd = math.mod(day,10)
 	   return	(idd==1 and day~=11 and "st")  or (idd==2 and day~=12 and "nd") or (idd==3 and day~=13 and "rd") or "th"
 end
@@ -1914,7 +2053,7 @@ end
 --========================================================================
 -- Format a STRING date, e.g. 2005-10-4 in ISO format, into a human format.
 -- Default for stripZeros is TRUE.
-function formatDate(s, f, stripZeros)
+local function formatDate(s, f, stripZeros)
 	if (stripZeros == nil) then stripZeros = true end
 	if (s ~= "") then
 		f = f or "%x"
@@ -1938,41 +2077,11 @@ function formatDate(s, f, stripZeros)
 end
 
 
-
-
-function split(str, pat, doTrim)
-	pat = pat or ","
-	if (not str) then
-		return nil
-	end
-	str = tostring(str)
-	local t = {}
-	local fpat = "(.-)" .. pat
-	local last_end = 1
-	local s, e, cap = str:find(fpat, 1)
-	while s do
-		if s ~= 1 or cap ~= "" then
-		if doTrim then cap = trim(cap) end
-		table.insert(t,cap)
-		end
-		last_end = e+1
-		s, e, cap = str:find(fpat, last_end)
-	end
-	if last_end <= #str then
-		cap = str:sub(last_end)
-		if doTrim then cap = trim(cap) end
-		table.insert(t,cap)
-	end
-	return t
-end
-
-
-
 -------------------------------------------------
 -- Shrink the obj away until it is small, then disappear it.
 -- Restore its size when done, but leave it hidden
 -- Default is shrink to center, but can set destX, destY
-function shrinkAway (obj, callback, transitionSpeed, destX, destY)
+local function shrinkAway (obj, callback, transitionSpeed, destX, destY)
 
 	destX = destX or midscreenX
 	destY = destY or midscreenY
@@ -2002,7 +2111,7 @@ end
 
 
 -------------------------------------------------
-function fadeOut (obj, callback, transitionSpeed)
+local function fadeOut (obj, callback, transitionSpeed)
 	--print ("fadeOut: time="..fadePageTime)
 	callback = callback or nil
 	if (type(callback) ~= "function") then callback = nil end
@@ -2018,7 +2127,7 @@ function fadeOut (obj, callback, transitionSpeed)
 end
 
 -------------------------------------------------
-function fadeIn (obj, callback, transitionSpeed)
+local function fadeIn (obj, callback, transitionSpeed)
 	--print ("fadeIn: time="..fadePageTime)
 	callback = callback or nil
 	if (type(callback) ~= "function") then callback = nil end
@@ -2043,7 +2152,7 @@ end
 ------------------------------------------------------------------------
 -- Show a message, then fade away
 ------------------------------------------------------------------------
-function tellUser(message, x,y)
+local function tellUser(message, x,y)
 
 	if (not message) then
 		return true
@@ -2158,7 +2267,7 @@ end
 	spinner(p)
 --]]
 -------------------------------------------------
-function spinner(p)
+local function spinner(p)
 	p = p or {}
 
 	local delay = p.delay or 500
@@ -2224,20 +2333,20 @@ function spinner(p)
 end
 
 local rr = display.newGroup()
-function showSpinner()
+local function showSpinner()
 		rr = display.newRect(0,0,100,100)
 		rr.x = midscreenX
 		rr.y = midscreenY
 		rr:setFillColor (255,0,0)
 end
 
-function hideSpinner()
+local function hideSpinner()
 		rr:removeSelf()
 		oogabooga.r = nil
 end
 
 
-function activityIndicator( mode )
+local function activityIndicator( mode )
 	if mode then
 		native.setActivityIndicator( true )
 	else
@@ -2245,11 +2354,11 @@ function activityIndicator( mode )
 	end
 end
 
-function activityIndicatorOn( mode )
+local function activityIndicatorOn( mode )
 	timer.performWithDelay(1, function() native.setActivityIndicator( true ) end )
 end
 
-function activityIndicatorOff( mode )
+local function activityIndicatorOff( mode )
 	timer.performWithDelay(1, function() native.setActivityIndicator( false ) end )
 end
 
@@ -2258,7 +2367,7 @@ end
 -- CLEAN GROUP
 ------------------------------------------------------------------------
 
-function cleanGroups ( curGroup, level )
+local function cleanGroups ( curGroup, level )
 	if curGroup.numChildren then
 		while curGroup.numChildren > 0 do
 			cleanGroups ( curGroup[curGroup.numChildren], level+1 )
@@ -2277,7 +2386,7 @@ end
 -- CALL CLEAN FUNCTION
 ------------------------------------------------------------------------
 
-function callClean ( moduleName )
+local function callClean ( moduleName )
 	if type(package.loaded[moduleName]) == "table" then
 		if string.lower(moduleName) ~= "main" then
 			for k,v in pairs(package.loaded[moduleName]) do
@@ -2293,7 +2402,7 @@ end
 -- UNLOAD SCENE
 ------------------------------------------------------------------------
 
-function unloadModule ( moduleName )
+local function unloadModule ( moduleName )
 	fxTime = fxTime or 200
 	if type(package.loaded[moduleName]) == "table" then
 		package.loaded[moduleName] = nil
@@ -2312,7 +2421,7 @@ end
 
 
 --[[
-function spinner()
+local function spinner()
 	local isAndroid = "Android" == system.getInfo("platformName")
 
 	if(isAndroid) then
@@ -2353,7 +2462,7 @@ end
 
 -------------------------------------------------
 -- Toggle an object, transitioning between a given alpha, and zero.
-function toggleObject(obj, fxTime, opacity, onComplete)
+local function toggleObject(obj, fxTime, opacity, onComplete)
 	fxTime = tonumber(fxTime)
 	opacity = applyPercent(opacity,1)
 	--print ()
@@ -2419,7 +2528,7 @@ end
 
 -------------------------------------------------
 -- Hide an object, transitioning between a given alpha, and zero.
-function hideObject(obj, fxTime, opacity, onComplete)
+local function hideObject(obj, fxTime, opacity, onComplete)
 	fxTime = tonumber(fxTime)
 	opacity = tonumber(opacity)
 
@@ -2482,7 +2591,7 @@ end
 
 
 -- returns true/false depending whether value is a percent
-function isPercent (x)
+local function isPercent (x)
 	v,s = string.match(x, "(%d+)(%%)$")
 	if (s == "%") then
 		return true
@@ -2493,7 +2602,7 @@ end
 
 
 -- Return x%, e.g. 10% returns .10
-function percent (x)
+local function percent (x)
 	v = string.match(x, "(%d+)%%$")
 	if v then
 		v = v / 100
@@ -2501,7 +2610,7 @@ function percent (x)
 	return v
 end
 
-function applyPercentIfSet(x,y,noRound)
+local function applyPercentIfSet(x,y,noRound)
 	if (x ~= nil) then
 		return applyPercent (x,y,noRound)
 	else
@@ -2513,7 +2622,7 @@ end
 -- Find new width/height to margins within an x,y
 -- x,y default to the screen
 -- Return ration r, the amount to use for rescaling, e.g. obj:scale(r,r)
-function ratioToFitMargins (w,h, t,b,l,r, x,y)
+local function ratioToFitMargins (w,h, t,b,l,r, x,y)
 	local x = x or screenW
 	local y = y or screenH
 
@@ -2541,7 +2650,7 @@ end
 -- DEFAULT: do not resize larger!
 -- RETURNS THE RATIO for scaling. Why? Because it seems there's a bug in Corona
 -- that means rescaling inside of this function screws up positioning.
-function scaleObjectToMargins (obj, t,b,l,r, xMax,yMax, reduceOnly)
+local function scaleObjectToMargins (obj, t,b,l,r, xMax,yMax, reduceOnly)
 	local ratio
 
 	if (reduceOnly == nil) then
@@ -2598,7 +2707,7 @@ end
 --   pic = loadImageFile(filename)
 --   pic.width, pic.height = funx.getFinalSizes (w,h, pic.width, pic.height, true)
 
-function getFinalSizes (w,h, originalW, originalH, p)
+local function getFinalSizes (w,h, originalW, originalH, p)
 	local wPercent, hPercent
 	if p == nil then p = true end
 	w = tonumber(w)
@@ -2646,7 +2755,7 @@ end
 -- ScaleObjToSize
 -- Scale an object to width/height settings.
 -- The new values are w,h. They could be percentages, and if only one is present, the other is the same.
-function ScaleObjToSize (obj, w,h)
+local function ScaleObjToSize (obj, w,h)
 	local wPercent, hPercent
 	local originalW = obj.contentWidth
 	local originalH = obj.contentHeight
@@ -2679,7 +2788,7 @@ end
 
 
 
-function AddCommas( number, maxPos )
+local function AddCommas( number, maxPos )
 
 	local s = tostring( number )
 	local len = string.len( s )
@@ -2701,14 +2810,14 @@ function AddCommas( number, maxPos )
 
 end
 
-function lines(str)
+local function lines(str)
 	local t = {}
 	local function helper(line) table.insert(t, line) return "" end
 	helper((str:gsub("(.-)\r?\n", helper)))
 	return t
 end
 
-function loadFile(filename)
+local function loadFile(filename)
 	local filePath = system.pathForFile( filename, system.ResourceDirectory )
 
 	local hFile,err = io.open(filePath,"r");
@@ -2727,10 +2836,10 @@ end
 -- Build a display object using a template and a table
 -- Each line of the template is settings for text the display object
 -- Each line is comma separated, starting with the name of the field in the obj to use
-function buildTextDisplayObjectsFromTemplate (template, obj)
+local function buildTextDisplayObjectsFromTemplate (template, obj)
 	-- split the template
 	local objs = {}
-	for i,line in pairs(lines(funx.trim(template))) do
+	for i,line in pairs(lines(trim(template))) do
 		--print ("Line : "..line)
 		local params = split (line, ",")
 		local name = params[1]
@@ -2752,7 +2861,7 @@ function buildTextDisplayObjectsFromTemplate (template, obj)
 		o.alpha = 1.0
 		objs[name] = o
 		--print ("Params for "..name..":")
-		funx.dump(params)
+		dump(params)
 
 	end
 	return objs
@@ -2764,7 +2873,7 @@ end
 --------------------------------------------------------
 --
 
-function stripCommandLinesFromText(text)
+local function stripCommandLinesFromText(text)
 	local substring = string.sub
 	local cleanText = ""
 	for line in string.gmatch(text, "[^\n]+") do
@@ -2786,7 +2895,7 @@ end
 -- Styles are simply the formatting lines, ### set, ....
 -- We pass a table of styles:
 -- styles = { stylename = stylestring, ... }
-function loadTextStyles(filename, path)
+local function loadTextStyles(filename, path)
 	if (filename) then
 		path = path or system.DocumentsDirectory
 		local filePath = system.pathForFile( filename, path )
@@ -2817,12 +2926,12 @@ function loadTextStyles(filename, path)
 end
 
 --[[
-function getTextStyles ()
+local function getTextStyles ()
 	return textStyles or {}
 end
 ]]
 --[[
-function setTextStyles (t)
+local function setTextStyles (t)
 	textStyles = t or {}
 	for n,v in pairs(textStyles) do
 		if (type(v) ~= "table") then
@@ -2836,7 +2945,7 @@ end
 
 -- Get an adjustment for a font, to position it closer to its real baseline
 -- Assume x-height is about 60% of the font height.
-function getXHeightAdjustment (font,size)
+local function getXHeightAdjustment (font,size)
 	local c = "X"
 	local t = display.newText(c,0,0,font,size)
 	local h = t.height
@@ -2852,7 +2961,7 @@ end
 
 
 -- Testing function to show a line and insert into group g
-function showTestBox (g,x,y,len, font,size,lineHeight,fontMetrics)
+local function showTestBox (g,x,y,len, font,size,lineHeight,fontMetrics)
 
 	local fontInfo = fontMetrics.getMetrics(font)
 	local baseline = fontInfo.baseline
@@ -2869,7 +2978,7 @@ end
 
 
 -- Testing function to show a line and insert into group g
-function showTestLine (g,x,y,t,leading)
+local function showTestLine (g,x,y,t,leading)
 	y = math.floor(y)
 	leading = leading or 0
 	len = len or 100
@@ -2900,7 +3009,7 @@ end
 -- we have to allow for a special code for line breaks: [[[cr]]]
 --------------------------------------------------------
 
-function autoWrappedText (text, font, size, lineHeight, color, width, textAlignment, opacity, minCharCount, targetDeviceScreenSize, letterspacing, maxHeight, minWordLen, textstyles, defaultStyle, cacheDir)
+local function autoWrappedText (text, font, size, lineHeight, color, width, textAlignment, opacity, minCharCount, targetDeviceScreenSize, letterspacing, maxHeight, minWordLen, textstyles, defaultStyle, cacheDir)
 
 	local textwrap = require ("textwrap")
 
@@ -2911,7 +3020,7 @@ end
 
 
 
-function capitalize(str)
+local function capitalize(str)
 	local function tchelper(first, rest)
 	  return first:upper()..rest:lower()
 	end
@@ -2932,7 +3041,7 @@ end
 -- Scale doesn't seem to work right, so ignore it, and it will be 1, which is OK.
 --------------------------------------------------------
 
-function adjustXYforShadow (x, y, rp, shadowOffset, scale)
+local function adjustXYforShadow (x, y, rp, shadowOffset, scale)
 	local stringFind = string.find
 
 	if (shadowOffset) then
@@ -2983,7 +3092,7 @@ end
 -- the provided newReferencePoint (e.g. center).
 --------------------------------------------------------
 
-function referenceAdjustedXY (obj, x, y, newReferencePoint, scale, shadowOffset)
+local function referenceAdjustedXY (obj, x, y, newReferencePoint, scale, shadowOffset)
 	local stringFind = string.find
 
 	rx = obj.xReference
@@ -3045,7 +3154,7 @@ function referenceAdjustedXY (obj, x, y, newReferencePoint, scale, shadowOffset)
 end
 
 
-function fixCapsForReferencePoint(r)
+local function fixCapsForReferencePoint(r)
 	if (r) then
 		r = tostring(r)
 		r = r:gsub("top", "Top")
@@ -3069,7 +3178,7 @@ end
 -- *** This is based on 0,0 being the center of the space defined by w x h ***
 -- Default w,h is the screen.
 
-function positionObject(x,y,w,h,margins)
+local function positionObject(x,y,w,h,margins)
 	w = w or screenW
 	h = h or screenH
 
@@ -3086,7 +3195,7 @@ function positionObject(x,y,w,h,margins)
 	elseif (x == "center") then
 		xpos = 0
 	else
-		xpos = funx.applyPercent(x,w) or 0
+		xpos = applyPercent(x,w) or 0
 	end
 
 	-- Vertical offsets
@@ -3097,7 +3206,7 @@ function positionObject(x,y,w,h,margins)
 	elseif (y == "center") then
 		ypos = 0
 	else
-		ypos = funx.applyPercent(y,h) or 0
+		ypos = applyPercent(y,h) or 0
 	end
 
 	return xpos, ypos
@@ -3105,16 +3214,16 @@ end
 
 --=====
 --- Make a margins table from a string, order is T/L/B/R, e.g. "10,20,40,20"
-function stringToMarginsTable(str, default)
+local function stringToMarginsTable(str, default)
 	local m
 	default = default or {0,0,0,0}
 
 	if (type(default) == "string") then
-		m = funx.split ( (str or default), ",")
+		m = split ( (str or default), ",")
 	elseif (not str or str == "") then
-		m = funx.split ( default, ",")
+		m = split ( default, ",")
 	else
-		m = funx.split ( str, ",")
+		m = split ( str, ",")
 	end
 
 	local margins = {
@@ -3138,12 +3247,12 @@ end
 -- *** This is based on 0,0 being the center of the space defined by w x h ***
 -- Default w,h is the screen.
 
-function positionObjectAroundCenter(x,y,w,h,margins)
+local function positionObjectAroundCenter(x,y,w,h,margins)
 	w = w or screenW
 	h = h or screenH
 
-	--x = funx.applyPercent(x,w) or 0
-	--y = funx.applyPercent(y,h) or 0
+	--x = applyPercent(x,w) or 0
+	--y = applyPercent(y,h) or 0
 
 	margins = margins or {top=0, bottom=0,left=0,right=0}
 
@@ -3155,7 +3264,7 @@ function positionObjectAroundCenter(x,y,w,h,margins)
 	elseif (x == "center") then
 		xpos = 0
 	else
-		xpos = funx.applyPercent(x,w) or 0
+		xpos = applyPercent(x,w) or 0
 	end
 
 	-- Vertical offsets
@@ -3166,7 +3275,7 @@ function positionObjectAroundCenter(x,y,w,h,margins)
 	elseif (y == "center") then
 		ypos = 0
 	else
-		ypos = funx.applyPercent(y,h) or 0
+		ypos = applyPercent(y,h) or 0
 	end
 
 	return xpos, ypos
@@ -3195,7 +3304,8 @@ end
 -- picture inside a box, this function returns its proper position in the box, so you
 -- only need to set the x,y.
 
-function positionObjectWithReferencePoint(x,y,w,h,margins, absoluteflag, refPointSimpleText)
+local function positionObjectWithReferencePoint(x,y,w,h,margins, absoluteflag, refPointSimpleText)
+	local xpos, ypos
 	w = w or screenW
 	h = h or screenH
 	absoluteflag = absoluteflag or false
@@ -3225,7 +3335,7 @@ function positionObjectWithReferencePoint(x,y,w,h,margins, absoluteflag, refPoin
 		xpos = 0
 		xref = "Center"
 	else
-		x = funx.applyPercent(x,w) or 0
+		x = applyPercent(x,w) or 0
 		xpos = x - (w/2) + margins.left
 		xref = "Left"
 	end
@@ -3240,7 +3350,7 @@ function positionObjectWithReferencePoint(x,y,w,h,margins, absoluteflag, refPoin
 		ypos = 0
 		yref = "Center"
 	else
-		y = funx.applyPercent(y,h) or 0
+		y = applyPercent(y,h) or 0
 		ypos = y - (h/2) + margins.top
 		yref = "Top"
 	end
@@ -3256,11 +3366,94 @@ function positionObjectWithReferencePoint(x,y,w,h,margins, absoluteflag, refPoin
 	end
 end
 
+
+
+
+
+local function setAnchorFromReferencePoint(obj, pos)
+	pos = string.lower(pos)
+	
+	if 	   pos == "topleftreferencepoint"      then obj.anchorX, obj.anchorY = 0, 0
+	elseif pos == "topcenterreferencepoint"    then obj.anchorX, obj.anchorY = 0.5, 0
+	elseif pos == "toprightreferencepoint"     then obj.anchorX, obj.anchorY = 1, 0
+	elseif pos == "centerleftreferencepoint"   then obj.anchorX, obj.anchorY = 0, 0.5
+	elseif pos == "centerreferencepoint"       then obj.anchorX, obj.anchorY = 0.5, 0.5
+	elseif pos == "centerrightreferencepoint"  then obj.anchorX, obj.anchorY = 1, 0.5
+	elseif pos == "bottomleftreferencepoint"   then obj.anchorX, obj.anchorY = 0, 1
+	elseif pos == "bottomcenterreferencepoint"  then obj.anchorX, obj.anchorY = 0.5, 1
+	elseif pos == "bottomrightreferencepoint"  then obj.anchorX, obj.anchorY = 1, 1
+	else obj.anchorX, obj.anchorY = 0.5, 0.5
+	end
+end
+
+
+local function convertAnchorToReferencePointName (obj)
+	local post = ""
+	if ( {obj.anchorX, obj.anchorY} == {0, 0} ) then post = "TopLeftReferencePoint"
+	elseif ( {obj.anchorX, obj.anchorY} == {0.5, 0} ) then post = "TopCenterReferencePoint"
+	elseif ( {obj.anchorX, obj.anchorY} == {1, 0} ) then post = "TopRightReferencePoint"
+	elseif ( {obj.anchorX, obj.anchorY} == {0, 0.5} ) then post = "CenterLeftReferencePoint"
+	elseif ( {obj.anchorX, obj.anchorY} == {0.5, 0.5} ) then post = "CenterReferencePoint"
+	elseif ( {obj.anchorX, obj.anchorY} == {1, 0.5} ) then post = "CenterRightReferencePoint"
+	elseif ( {obj.anchorX, obj.anchorY} == {0.5, 1} ) then post = "BottomCenterReferencePoint"
+	elseif ( {obj.anchorX, obj.anchorY} == {1, 1} ) then post = "BottomRightReferencePoint"
+	end
+	return post
+end
+
+
+-- Keep an object in the same place on screen while changing its anchor point.
+-- This is useful if an object is positioned Top Left (0,0), then we want to change the
+-- anchor point but not change the objects position on screen.
+-- *** This depends on 
+local function reanchorToCenter (obj, a, x, y)
+	
+	if not a then return x,y; end
+	
+	if (string.lower(a) == "centerreferencepoint") then
+		return x,y
+	end
+		
+	-- old anchor values, and x,y
+	local oaX, oaY = obj.anchorX, obj.anchorY
+--	x = x or obj.x
+--	y = y or obj.y
+
+	
+	-- a is a table, then it is an anchor point, else it is the name of a reference point
+--	if (type(a) == "table") then
+--		obj.anchorX, obj.anchorY = a.x, a.y
+--	else
+--		setAnchorFromReferencePoint(obj, a)
+--	end
+	
+	-- new anchor values
+	local naX, naY = 0.5, 0.5
+--
+--	-- Get width/height
+	local ac = obj.anchorChildren
+	obj.anchorChildren = true
+	local width, height = obj.width, obj.height
+	obj.anchorChildren = ac
+	
+	-- distance from top-left
+	local deltaX = (naX * width) - (oaX * width)
+	local deltaY = (naY * height) - (oaY * height)
+	
+	local x = x + deltaX
+	local y = y + deltaY
+	
+	return x,y
+	
+end
+
+
+
 --------------
 --- Check that a key in table 1 exists in table 2.
 -- Useful for making sure the a setting value in the user settings is correctly named.
 -- example: keysExistInTable(usersettings,settings)
-function keysExistInTable(t1,t2)
+local function keysExistInTable(t1,t2)
 	for k,v in pairs (t1) do
 		if (type(v) == "table") then
 			for kk,vv in pairs (v) do
@@ -3276,7 +3469,7 @@ end
 
 --- Check if a value is in a table
 -- Same as in_array(myarray, value)
-function inTable(needle, haystack) -- find element v of haystack satisfying f(v)
+local function inTable(needle, haystack) -- find element v of haystack satisfying f(v)
 	if (haystack and type(haystack) == "table") then
 		for _, v in ipairs(haystack) do
 			if ( v == needle ) then
@@ -3301,11 +3494,11 @@ end
 -- If toHDR, then force the result to be HDR. This is useful for widgets and other libraries
 -- that don't let us redefine their display.setFillColor functions.
 
-function stringToColorTable(s, toHDR, isHDR)
+local function stringToColorTable(s, toHDR, isHDR)
 	if (type(s) == "string") then
 		s = trim(s, true)
 		if (s) then
-			s = funx.split(s, ",")
+			s = split(s, ",")
 
 			local maxVal = 255	-- RGB max
 			--[[
@@ -3321,12 +3514,12 @@ function stringToColorTable(s, toHDR, isHDR)
 			elseif (opacity == "transparent") then
 				s[4] = 0
 			else
-				s[4] = funx.applyPercent(s[4], maxVal) or maxVal
+				s[4] = applyPercent(s[4], maxVal) or maxVal
 			end
 			-- force numeric
 			for i,j in pairs(s) do
 				s[i] = tonumber(j)
-				s[i] = funx.applyPercent(j,maxVal) or maxVal
+				s[i] = applyPercent(j,maxVal) or maxVal
 			end
 			
 			if (toHDR) then
@@ -3340,7 +3533,7 @@ end
 -- *** Apparently, not necessary! I built this due to a bug in the dmc_kolor patch.
 -- Here's a shortcut for getting an HDR color from RGB or HDR values
 -- Set isHDR to true if the input string uses HDR values
-function stringToColorTableHDR(s, isHDR)
+local function stringToColorTableHDR(s, isHDR)
 	return stringToColorTable(s, true, isHDR)
 end
 
@@ -3349,7 +3542,7 @@ end
 -- Given a width/height, build picture corners to fit.
 -- filenames are of each corner
 -- offsets specify positioning correction
-function buildPictureCorners (w,h, filenames, offsets)
+local function buildPictureCorners (w,h, filenames, offsets)
 	local g = display.newGroup()
 	local imageTL = display.newImage(g, filenames.TL)
 	local imageTR = display.newImage(g, filenames.TR)
@@ -3380,14 +3573,14 @@ end
 ----------------------------------------------------------------------
 -- TESTING TOOLS:
 -- Print local vs. stage coordinates by touching an object.
-function showContentToLocal(obj, state)
+local function showContentToLocal(obj, state)
 	function showCoordinates( event )
 	--		Get x, y of touch event in content coordinates
 			local contentx, contenty = event.x, event.y
 	--		Convert to local coordinates of
 			local localx, localy = event.target:contentToLocal(contentx, contenty)
 	--		Display content and local coordinate values
-			print ("funx.showContentToLocal (content=>local): ", contentx..", "..contenty, "=>", floor(localx) ..", ".. floor(localy), ":", obj.localX )
+			print ("showContentToLocal (content=>local): ", contentx..", "..contenty, "=>", floor(localx) ..", ".. floor(localy), ":", obj.localX )
 		return true
 	end
 
@@ -3410,7 +3603,7 @@ end
 ------------------------------------------------------------
 ------------------------------------------------------------
 -- Alert the user that something significant has happened by flashing the screen to white.
-function flashscreen(t,a)
+local function flashscreen(t,a)
 
 	t = t or 100
 	a = a or 0.5
@@ -3440,7 +3633,7 @@ end
 -- so I'm using audio for it.
 -- Return FALSE if the type is unknown
 -- NOTE: we're checking for 3 letter suffixes, so .html will mess up...use ".htm"
-function mediaFileType(f)
+local function mediaFileType(f)
 	local suffix = string.sub(f, string.len(f)-3, -1)
 	local t = {
 		jpg="image",
@@ -3479,7 +3672,7 @@ end
 -- dirname: path INSIDE the system.DocumentsDirecotyr (or systemdir)
 -- unique: if the directory exists, make a unique version
 -- systemdir: Default to the system.DocumentsDirectory
-function mkdir (dirname, prefix, unique, systemdir)
+local function mkdir (dirname, prefix, unique, systemdir)
 
 	local systemdir = systemdir or system.DocumentsDirectory
 
@@ -3525,15 +3718,15 @@ end
 ------------------------------------------------------------
 -- Make cover up bars for differenly shaped screens
 -- Color is a color string "R,G,B"
-function coverUpScreenEdges(color)
+local function coverUpScreenEdges(color)
 
 	color = color or "0,0,0"
 --color = "200,30,30"
 	local c = stringToColorTable(color)
 
 	-- Put cover-up bars for a different screen shape.
-	local deviceWidth = funx.round(( display.contentWidth - (display.screenOriginX * 2) ) / display.contentScaleX)
-	local deviceHeight = funx.round(( display.contentHeight - (display.screenOriginY * 2) ) / display.contentScaleY)
+	local deviceWidth = round(( display.contentWidth - (display.screenOriginX * 2) ) / display.contentScaleX)
+	local deviceHeight = round(( display.contentHeight - (display.screenOriginY * 2) ) / display.contentScaleY)
 
 	local actualWidth = deviceWidth * display.contentScaleX
 	local actualHeight = deviceHeight * display.contentScaleY
@@ -3579,7 +3772,7 @@ end
 -- Styles:
 -- solid : a normal stroke
 -- thin-thick : 25% inner stroke, 50% out, with 25% padding
-function strokeRectObject(o,params)
+local function strokeRectObject(o,params)
 	local floor = math.floor
 
 			local function framingObject(o,padding,fillcolor,strokeWidth,strokeColor)
@@ -3648,7 +3841,7 @@ end
 
 -------------------------------------------------
 -- Convert "left", "center", "right" to numerics or percentages
-function positionByName(t, margins, absoluteflag)
+local function positionByName(t, margins, absoluteflag)
 
 	if (not margins or absoluteflag) then
 		margins = {left = 0, right=0, top=0, bottom=0 }
@@ -3677,7 +3870,7 @@ end
 
 -------------------------------------------------
 -- cleanPath: clean up a path
-function cleanPath (p)
+local function cleanPath (p)
 	if (p) then
 		local substring = string.sub
 		p = p:gsub("/\./","/")
@@ -3691,7 +3884,7 @@ end
 -- joinAsPath: make a path from different elements of a table.
 -- Useful to join pieces together, e.g. server + path + filename
 -- If username/password are passed, add them to the URL, e.g. username:password@restofurl
-function joinAsPath( pieces, username, password)
+local function joinAsPath( pieces, username, password)
 	local path = cleanPath(table.concat(pieces, "/"))
 	local pre = table.concat({username,password},":")
 	if (pre ~= "") then
@@ -3706,7 +3899,7 @@ end
 -------------------------------------------------
 -- Pure Lua version of dirname.
 --
-function dirname(path)
+local function dirname(path)
 	while true do
 		if path == "" or
 		   string.sub(path, -1) == "/" or
@@ -3736,7 +3929,7 @@ end
 -- basename()
 -- Returns trailing name component of path
 -- Extract my/dir/bottomdir => bottomdir
-function basename (path)
+local function basename (path)
 	path = string.gsub(path, "%/$", "")
 	path = "/"..path
 	local d = string.gsub(path, "^.*/","")
@@ -3746,7 +3939,7 @@ end
 -------------------------------------------------
 -- Copy File (binary copy)
 -- This is a binary file copy
-function copyFile (src, srcPath, srcBaseDir, target, targetBaseDir)
+local function copyFile (src, srcPath, srcBaseDir, target, targetBaseDir)
 
 	local size = 2^13
 
@@ -3769,7 +3962,7 @@ end
 -------------------------------------------------
 -- Copy a directory
 -- Create a copy of the directory 'src' inside of the directory 'target'
-function copyDir (src, srcBaseDir, target, targetBaseDir, newname)
+local function copyDir (src, srcBaseDir, target, targetBaseDir, newname)
 
 
 	srcBaseDir = srcBaseDir or system.CachesDirectory
@@ -3831,7 +4024,7 @@ end
 -------------------------------------------------
 -- Delete a directory even if not empty
 -- If keepDir is true, then only delete the contents
-function rmDir(dir,path, keepDir)
+local function rmDir(dir,path, keepDir)
 	path = path or system.DocumentsDirectory
 
 	local doc_path = system.pathForFile( dir, path )
@@ -3860,7 +4053,7 @@ end
 -- Make a directory Tree
 -- If we ask for "dirA/dirB/dirC", we might need to create dirA and dirB before creating
 -- dirC.
-function mkdirTree (dirname, systemdir)
+local function mkdirTree (dirname, systemdir)
 
 	systemdir = systemdir or system.CachesDirectory
 
@@ -3893,7 +4086,7 @@ end
 
 
 
-function url_decode(str)
+local function url_decode(str)
   str = string.gsub (str, "+", " ")
   str = string.gsub (str, "%%(%x%x)",
 	  function(h) return string.char(tonumber(h,16)) end)
@@ -3902,7 +4095,7 @@ function url_decode(str)
 end
 
 
-function url_encode(str)
+local function url_encode(str)
   if (str) then
 	str = string.gsub (str, "\n", "\r\n")
 	str = string.gsub (str, "([^%w ])",
@@ -3913,7 +4106,7 @@ function url_encode(str)
 end
 
 
-function display.newArc(x,y,w,h,s,e)
+local function newArc(x,y,w,h,s,e)
 	local xc,yc,cos,sin = x+w/2,y+h/2,math.cos,math.sin
 	s,e = s or 0, e or 360
 	s,e = math.rad(s),math.rad(e)
@@ -3925,7 +4118,7 @@ end
 
 -- Call like this: setFillColorFromString(obj, "10,20,30,30%")
 -- All values can be number or percent
-function setFillColorFromString(obj, cstring)
+local function setFillColorFromString(obj, cstring)
 	local s = stringToColorTable(cstring)
 	if (obj.setFillColor) then
 		obj:setFillColor(s[1], s[2], s[3], s[4])
@@ -3936,7 +4129,7 @@ end
 
 
 
-function getDeviceMetrics( )
+local function getDeviceMetrics( )
 
 	-- See: http://en.wikipedia.org/wiki/List_of_displays_by_pixel_density
 
@@ -3993,7 +4186,7 @@ function getDeviceMetrics( )
 end
 
 -- This makes a mask for a widget.scrollView
-function makeMask(width, height, maskDirectory)
+local function makeMask(width, height, maskDirectory)
 
 	-- Display.save uses the screen size, so a retina will save a double-size image than what we need
 
@@ -4030,7 +4223,7 @@ end
 
 
 -- This makes a mask for a rectangle on the screen at a particular x,y
-function makeMaskForRect(x,y,width, height, maskDirectory)
+local function makeMaskForRect(x,y,width, height, maskDirectory)
 
 	-- Display.save uses the screen size, so a retina will save a double-size image than what we need
 
@@ -4076,13 +4269,13 @@ local OPTIONS_LIST_HEIGHT = 300
 local OPTIONS_LIST_HEIGHT = 200
 local thingToMask = somedisplayobject
 
-funx.applyMask({
+applyMask({
 	object = thingToMask,
 	width = OPTIONS_LIST_WIDTH,
 	height = OPTIONS_LIST_HEIGHT
 })
 --]]
-function applyMask(params)
+local function applyMask(params)
 
 	local GENERIC_MASK_FILE = "_ui/generic-mask-1024x768.png"
 	local generic_mask_width = 1024
@@ -4106,8 +4299,8 @@ function applyMask(params)
 	params.object.maskScaleX = params.width/generic_mask_width
 	params.object.maskScaleY = params.height/generic_mask_height
 	--there may be a need in the future add logic to the positioning for different reference points
-	params.object.maskX = params.width/2
-	params.object.maskY = params.height/2
+	params.object.maskX = 0	--params.width/2
+	params.object.maskY = 0	--params.height/2
 
 end
 
@@ -4115,7 +4308,7 @@ end
 
 
 -- DOES NOT WORK
-function translateHTMLEntity(s)
+local function translateHTMLEntity(s)
     local _ENTITIES = {
 					  ["&lt;"] = "<",
                       ["&gt;"] = ">",
@@ -4152,7 +4345,7 @@ end
 
 
 
-function checksum(str)
+local function checksum(str)
    local temp = 0
    local weight = 10
    for i = 1, string.len(str) do
@@ -4178,7 +4371,7 @@ end
 
 -- Get status bar height.
 -- Problem is, if the bar is hidden, the height is zero
-function getStatusBarHeight()
+local function getStatusBarHeight()
 	local t = display.topStatusBarContentHeight
 	if (t == 0) then
 		display.setStatusBar( display.DarkStatusBar )
@@ -4190,7 +4383,7 @@ end
 
 -----------------------------------
 -- Clear all contents of the directory
-function deleteDirectoryContents(dir, whichSystemDirectory)
+local function deleteDirectoryContents(dir, whichSystemDirectory)
 	whichSystemDirectory = whichSystemDirectory or system.CachesDirectory
 	rmDir(dir, whichSystemDirectory, true)
 	--print ("deleteDirectoryContents", dir)
@@ -4199,17 +4392,25 @@ end
 
 --===================================
 --- Frame a group by adding rectangle to a group, behind it.
-function frameGroup(g, s, color)
-	local r = display.newRect(g, 0, 0, g.contentWidth, g.contentHeight)
-	r.strokeWidth = s or 1
+local function frameGroup(g, s, color)
+
+	local w,h = g.contentWidth or screenW, g.contentHeight or screenH
+
+	local r = display.newRect(g, 0, 0, w, h)
+	r.strokeWidth = s or 5
+
+	color = color or "255,0,0"
+
 	if (type(color) == "string") then
 		color = stringToColorTable(color)
 	end
-	r:setStrokeColor(color[1], color[2], color[3], color[4])
+	r:setStrokeColor(unpack(color))
+	
+	r:setFillColor(255,0,0, 50)
+	
 	r:toBack()
-	g:setReferencePoint(display.TopLeftReferencePoint)
-	r.x = 0
-	r.y = 0
+	r.anchorX, r.anchorY = 0, 0
+	r.x, r.y = 0,0
 end
 
 
@@ -4220,7 +4421,7 @@ end
 --	@param	n	number of elements of src to use
 --	@param	db	key-value table to check for validity
 --  @param  indexOrdered	(Boolean) If true, index result using ordered numbers not source keys. If indexed by keys, the result will be a key/value set using keys from src. Otherwise, result will be indexed numerically, starting at 1.
-function getRandomSet(src, n, db, indexOrdered)
+local function getRandomSet(src, n, db, indexOrdered)
 	local keys = {}
 	local i = 1
 	for k,v in pairs(src) do
@@ -4244,7 +4445,7 @@ function getRandomSet(src, n, db, indexOrdered)
 end
 
 
-function getFirstElement(t)
+local function getFirstElement(t)
 	local res
 	for i,j in pairs (t) do
 		res = {i,j}
@@ -4255,3 +4456,197 @@ end
 
 
 
+-- ====================================================================
+-- Check multiple paths for a file
+-- Used to look for book files in multiple places, hierarchically,
+-- e.g. look first in _user/books/ then on shelves
+-- Default with no values is to return the default book.
+-- @param	locations	Table: { 1 = { path = "path/to/book/folders", bookDir = "bookfolder", systemDirectory = system.ResourceDirectory }, ... }
+-- Example:
+-- findFile ( "book.xml", "_user/books/" , "_user" )
+-- ====================================================================
+local function findFile (filename, locations, default)
+	
+	default = default or "_user"
+	if (not filename or not locations or type(locations) ~= "table") then
+		return { path = default, systemDirectory = system.ResourceDirectory }
+	end
+	
+	local p
+	for i,loc in pairs(locations) do
+		--print ("Look for ", filename, "in", loc.path .. loc.bookDir)
+			
+		if ( fileExists( loc.path.. loc.bookDir .. "/" .. filename, loc.systemDirectory) ) then
+			--print ("Found ", filename, "in", loc.path .. loc.bookDir)
+			return loc.path, loc.systemDirectory
+		end
+	end
+	return false
+end
+
+-- ====================================================================
+-- Register new functions here
+-- ====================================================================
+
+
+FUNX.activityIndicator = activityIndicator
+FUNX.activityIndicatorOff = activityIndicatorOff
+FUNX.activityIndicatorOn = activityIndicatorOn
+FUNX.AddCommas = AddCommas
+FUNX.addPosRect = addPosRect
+FUNX.adjustXYforShadow  = adjustXYforShadow 
+FUNX.anchorBottomRightZero = anchorBottomRightZero
+FUNX.anchorCenter = anchorCenter
+FUNX.anchorCenterZero = anchorCenterZero
+FUNX.anchorTopLeft = anchorTopLeft
+FUNX.anchorTopLeftZero = anchorTopLeftZero
+FUNX.applyMask = applyMask
+FUNX.applyPercent  = applyPercent 
+FUNX.applyPercentIfSet = applyPercentIfSet
+FUNX.autoWrappedText  = autoWrappedText 
+FUNX.basename  = basename 
+FUNX.buildPictureCorners  = buildPictureCorners 
+FUNX.buildShadow = buildShadow
+FUNX.buildShadow1 = buildShadow1
+FUNX.buildTextDisplayObjectsFromTemplate  = buildTextDisplayObjectsFromTemplate 
+FUNX.callClean  = callClean 
+FUNX.canConnectWithServer = canConnectWithServer
+FUNX.capitalize = capitalize
+FUNX.centerInParent = centerInParent
+FUNX.checkScale = checkScale
+FUNX.checksum = checksum
+FUNX.cleanGroups  = cleanGroups 
+FUNX.cleanPath  = cleanPath 
+FUNX.copyDir  = copyDir 
+FUNX.copyFile  = copyFile 
+FUNX.coverUpScreenEdges = coverUpScreenEdges
+FUNX.datetime_to_unix_time = datetime_to_unix_time
+FUNX.deleteDirectoryContents = deleteDirectoryContents
+FUNX.dimScreen = dimScreen
+FUNX.dirname = dirname
+FUNX.newArc = newArc
+FUNX.dump = dump
+FUNX.escape = escape
+FUNX.fadeIn  = fadeIn 
+FUNX.fadeOut  = fadeOut 
+FUNX.fileExists = fileExists
+FUNX.findFile = findFile
+FUNX.fixCapsForReferencePoint = fixCapsForReferencePoint
+FUNX.flashscreen = flashscreen
+FUNX.formatDate = formatDate
+FUNX.frameGroup = frameGroup
+FUNX.get_date_parts = get_date_parts
+FUNX.getday_posfix = getday_posfix
+FUNX.getDeviceMetrics = getDeviceMetrics
+FUNX.getDisplayObjectParams = getDisplayObjectParams
+FUNX.getElementName  = getElementName 
+FUNX.getEscapedKeysForGsub = getEscapedKeysForGsub
+FUNX.getFinalSizes  = getFinalSizes 
+FUNX.getFirstElement = getFirstElement
+FUNX.getImageSize = getImageSize
+FUNX.getmonth = getmonth
+FUNX.getRandomSet = getRandomSet
+FUNX.getScaledFilename = getScaledFilename
+FUNX.getStatusBarHeight = getStatusBarHeight
+FUNX.getTextStyles  = getTextStyles 
+FUNX.getValue = getValue
+FUNX.getXHeightAdjustment  = getXHeightAdjustment 
+FUNX.hasFieldCodes = hasFieldCodes
+FUNX.hasFieldCodesSingle = hasFieldCodesSingle
+FUNX.hasNetConnection = hasNetConnection
+FUNX.hideObject = hideObject
+FUNX.hideSpinner = hideSpinner
+FUNX.initSystemEventHandler = initSystemEventHandler
+FUNX.inTable = inTable
+FUNX.isPercent  = isPercent 
+FUNX.isTable = isTable
+FUNX.joinAsPath = joinAsPath
+FUNX.keysExistInTable = keysExistInTable
+FUNX.lazyLoad = lazyLoad
+FUNX.lines = lines
+FUNX.loadData = loadData
+FUNX.loadFile = loadFile
+FUNX.loadImageFile = loadImageFile
+FUNX.loadTable = loadTable
+FUNX.loadTableFromFile = loadTableFromFile
+FUNX.loadTextStyles = loadTextStyles
+FUNX.ltrim = ltrim
+FUNX.makeMask = makeMask
+FUNX.makeMaskForRect = makeMaskForRect
+FUNX.mediaFileType = mediaFileType
+FUNX.mkdir  = mkdir 
+FUNX.mkdirTree  = mkdirTree 
+FUNX.OLD_substitutionsSLOWER  = OLD_substitutionsSLOWER 
+FUNX.openURLWithConfirm = openURLWithConfirm
+FUNX.pairsByKeys  = pairsByKeys 
+FUNX.percent  = percent 
+FUNX.percentOfScreenHeight  = percentOfScreenHeight 
+FUNX.percentOfScreenWidth  = percentOfScreenWidth 
+FUNX.popup = popup
+FUNX.popupWebpage = popupWebpage
+FUNX.positionByName = positionByName
+FUNX.positionObject = positionObject
+FUNX.positionObjectAroundCenter = positionObjectAroundCenter
+FUNX.positionObjectWithReferencePoint = positionObjectWithReferencePoint
+FUNX.setAnchorFromReferencePoint = setAnchorFromReferencePoint
+FUNX.convertAnchorToReferencePointName = convertAnchorToReferencePointName
+FUNX.reanchorToCenter = reanchorToCenter
+FUNX.printFuncName = printFuncName
+FUNX.ratioToFitMargins  = ratioToFitMargins 
+FUNX.referenceAdjustedXY  = referenceAdjustedXY 
+FUNX.removeFields  = removeFields 
+FUNX.removeFieldsSingle  = removeFieldsSingle 
+FUNX.removeFromTable = removeFromTable
+FUNX.replaceWildcard = replaceWildcard
+FUNX.rescaleFromIpad = rescaleFromIpad
+FUNX.resizeFromIpad = resizeFromIpad
+FUNX.rmDir = rmDir
+FUNX.round = round
+FUNX.round2 = round2
+FUNX.rtrim = rtrim
+FUNX.saveData = saveData
+FUNX.saveTable = saveTable
+FUNX.saveTableToFile = saveTableToFile
+FUNX.scaleFactorForRetina = scaleFactorForRetina
+FUNX.scaleObjectToMargins  = scaleObjectToMargins 
+FUNX.ScaleObjToSize  = ScaleObjToSize 
+FUNX.setFillColorFromString = setFillColorFromString
+FUNX.setTextStyles  = setTextStyles 
+FUNX.showContentToLocal = showContentToLocal
+FUNX.showSpinner = showSpinner
+FUNX.showTestBox  = showTestBox 
+FUNX.showTestLine  = showTestLine 
+FUNX.shrinkAway  = shrinkAway 
+FUNX.spinner = spinner
+FUNX.spinner = spinner
+FUNX.split = split
+FUNX.stringToColorTable = stringToColorTable
+FUNX.stringToColorTableHDR = stringToColorTableHDR
+FUNX.stringToMarginsTable = stringToMarginsTable
+FUNX.stripCommandLinesFromText = stripCommandLinesFromText
+FUNX.strokeRectObject = strokeRectObject
+FUNX.substitutions  = substitutions 
+FUNX.table_multi_sort = table_multi_sort
+FUNX.table_sort = table_sort
+FUNX.tableCopy = tableCopy
+FUNX.tableIsEmpty = tableIsEmpty
+FUNX.tablelength  = tablelength 
+FUNX.tableMerge = tableMerge
+FUNX.tableRemoveUnusedCodedElements = tableRemoveUnusedCodedElements
+FUNX.tableSubstitutions = tableSubstitutions
+FUNX.tellUser = tellUser
+FUNX.timePassed = timePassed
+FUNX.toggleObject = toggleObject
+FUNX.toZero = toZero
+FUNX.translateHTMLEntity = translateHTMLEntity
+FUNX.trim = trim
+FUNX.undimScreen = undimScreen
+FUNX.unescape  = unescape 
+FUNX.unloadModule  = unloadModule 
+FUNX.url_decode = url_decode
+FUNX.url_encode = url_encode
+FUNX.verifyNetConnectionOrQuit = verifyNetConnectionOrQuit
+FUNX.zSort = zSort
+
+
+return FUNX

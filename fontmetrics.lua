@@ -68,7 +68,7 @@ height: the percentage of the requested size, e.g. 300px, that the text really i
 
 local FM = {}
 
-require ("funx")
+local funx = require ("funx")
 
 local function loadMetricsFromFile (metricsfile, fontfacesfile, path)
 	local metricsPacked = {}
