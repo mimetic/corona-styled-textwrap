@@ -481,6 +481,9 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local textwrapIsCached = false
 	local cache = { { text = "", width = "", } }
 	local cacheIndex = 1
+	
+	-- Interpret the width so we can get it right caching:
+	width = funx.percentOfScreenWidth(width) or display.contentWidth
 
 	if ( cacheDir and cacheDir ~= "" ) then
 		textUID = "cache"..funx.checksum(text).."_"..tostring(width)
@@ -603,7 +606,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	settings.fontvariation = ""
 	settings.size = tonumber(size) or 12
 	settings.color = color or {0,0,0,0}
-	settings.width = funx.percentOfScreenWidth(width) or display.contentWidth
+	settings.width = width
 	settings.opacity = funx.applyPercent(opacity, OPAQUE) or OPAQUE
 	settings.targetDeviceScreenSize = targetDeviceScreenSize or screenW..","..screenH
 	settings.case = "NORMAL"
