@@ -205,6 +205,7 @@ function FM.new(metricsfile, fontfacesfile)
 		local fontInfo = {}
 		fontInfo = metrics[f]
 		if (not fontInfo) then
+			print ("WARNING: fontmetrics doesn't have info about the font, '"..tostring(f).."', using Baskerville settings.")
 			-- unknown font
 			fontInfo =	{
 				x1=-2.953125,
@@ -227,9 +228,7 @@ function FM.new(metricsfile, fontfacesfile)
 				descender=-18,
 				capheight=0.67209201388889,
 			}
-			if (type(f) == "string") then
-				print ("WARNING: fontmetrics doesn't have info about the font, '"..f.."', using Baskerville settings.")
-			else
+			if (type(f) ~= "string") then
 				print ("WARNING: fontmetrics was sent a font value that was not a name, probably a .user value.")
 			end
 		end

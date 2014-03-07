@@ -50,6 +50,8 @@ local match = string.match
 local gmatch = string.gmatch
 local find = string.find
 local gfind = string.gfind
+local lower = string.lower
+local upper = string.upper
 
 -- ALPHA VALUES, can change for RGB or HDR systems
 local OPAQUE = 255
@@ -123,7 +125,20 @@ local function centerInParent(g)
 return g
 end
 
-
+-- ------------------------------------------------------------
+-- Get index in system table of a system directory
+-- ------------------------------------------------------------
+local function indexOfSystemDirectory( systemPath )
+	local i = ""
+	if (systemPath == system.DocumentsDirectory) then
+		i = "DocumentsDirectory"
+	elseif (systemPath == system.ResourceDirectory) then
+		i = "ResourceDirectory"
+	elseif (systemPath == system.CachesDirectory) then
+		i = "CachesDirectory"
+	end
+	return i
+end
 
 
 
@@ -160,6 +175,23 @@ local function isTable(t)
 	return (type(t) == "table")
 end
 
+
+-----------------
+local function traceback ()
+	print ("FUNX.TRACEBACK:")
+	local level = 1
+	while true do
+		local info = debug.getinfo(level, "Sl")
+		if not info then break end
+		if info.what == "C" then	 -- is a C function?
+			print(level, "C function")
+		else	 -- a Lua function
+			print(string.format("[%s]:%d",
+								info.short_src, info.currentline))
+		end
+		level = level + 1
+	end
+end
 
 -----------------
 -- Fails for negatives, apparently
@@ -1146,23 +1178,23 @@ end
 -- If there is a "*" in the filename, the file MUST be a user file, found in the CachesDirectory.
 -- DEPRECATED: ALWAYS USE CORONA METHOD: method: true = use my method, false means use Corona method
 --------------------------------------------------------
-local function loadImageFile(filename, filepath, whichSystemDirectory)
+local function loadImageFile(filename, wildcardPath, whichSystemDirectory, showTraceOnFailure)
 	local scalingRatio = 1
 	local scaleFraction = 1
 	local scalesuffix = ""
 	local otherFound = false
 
-	filepath = filepath or "_user"
+	wildcardPath = wildcardPath or "_user"
 
-	-- If the filename starts with a wildcard, then replace it with the filepath
+	-- If the filename starts with a wildcard, then replace it with the wildcardPath
 	local wc = string.sub(filename,1,1)
-	if (wc == "*" and filepath) then
-		filename = replaceWildcard(filename, filepath)
+	if (wc == "*" and wildcardPath) then
+		filename = replaceWildcard(filename, wildcardPath)
 
 		-- Files inside _user are system files, everything else with a wildcard is
 		-- a downloaded book.
-		if (not find(filepath, "^_user") ) then
-		--if (filepath ~= "_user") then
+		if (not find(wildcardPath, "^_user") ) then
+		--if (wildcardPath ~= "_user") then
 			whichSystemDirectory = whichSystemDirectory or system.CachesDirectory
 		else
 			whichSystemDirectory = whichSystemDirectory or system.ResourceDirectory
@@ -1198,12 +1230,17 @@ local function loadImageFile(filename, filepath, whichSystemDirectory)
 			end
 --print ("loadImageFile: Using Corona method:", filename)
 		end
-		image:setReferencePoint(display.CenterReferencePoint)
-		image.x = 0
-		image.y = 0
+		anchorCenterZero(image)
 
 		return image, scaleFraction
 	else
+		
+		-- DEBUGGING TOOL
+		if (showTraceOnFailure) then
+			print ("funx.loadImageFile called by:")
+			traceback()
+		end
+	
 		local i = display.newGroup()
 		local image = display.newImage(i, "_ui/missing-image.png", system.ResourceDirectory, true)
 
@@ -1211,7 +1248,7 @@ local function loadImageFile(filename, filepath, whichSystemDirectory)
 		local syspath =  system.pathForFile( "", whichSystemDirectory )
 		--print ("loadImageFile: whichSystemDirectory", syspath )
 		if (syspath == "") then
-				syspath = "ResourcesDirectory"
+				syspath = "ResourceDirectory"
 		end
 		print ("WARNING: loadImageFile cannot find ",filename," in ",syspath)
 
@@ -1225,7 +1262,8 @@ local function loadImageFile(filename, filepath, whichSystemDirectory)
 		i:setReferencePoint(display.CenterReferencePoint)
 		i.x = 0
 		i.y = 0
-		return i, false
+		-- second returned value is scaleFraction and 1 does nothing but won't crash stuff
+		return i, 1
 	end
 end
 
@@ -1328,6 +1366,96 @@ local function canConnectWithServer(url, showActivity, callback, testing)
 end
 
 
+
+--------------
+--- Check that a key in table 1 exists in table 2.
+-- Useful for making sure the a setting value in the user settings is correctly named.
+-- example: keysExistInTable(usersettings,settings)
+local function keysExistInTable(t1,t2)
+	for k,v in pairs (t1) do
+		if (type(v) == "table") then
+			for kk,vv in pairs (v) do
+				if (t2[k] == nil or t2[k][kk] == nil) then
+					print ("WARNING: '"..k.." . "..kk.." is an unknown key.")
+				end
+			end
+		end
+	end
+
+end
+
+
+--- Check if a value is in a table
+-- Same as in_array(myarray, value)
+local function inTable(needle, haystack) -- find element v of haystack satisfying f(v)
+	if (haystack and type(haystack) == "table") then
+		for _, v in ipairs(haystack) do
+			if ( v == needle ) then
+				return v
+			end
+		end
+	end
+	return nil
+end
+
+--------------
+-- A Handy way to store an RGB or RGBA color is as a string, e.g. "250,250,10,50%"
+-- The 4th value is an alpha, 0-255, or OPAQUE or TRANSPARENT
+-- This returns a table from such a string.
+-- If given a table, this does nothing (in case the value was already converted somewhere!)
+--
+-- If any value is between 0 & 1, then we must be dealing with HDR values, not RGB values
+-- e.g. 0,0,2 must be RGB, but 0,0,0.1 must be HDR.
+-- We only have a problem when the highest value is 1, but when would anyone use an RGB value of 1? Never.
+-- Therefore, if all values <= 1 then it's and HDR value.
+--
+-- If toHDR, then force the result to be HDR. This is useful for widgets and other libraries
+-- that don't let us redefine their display.setFillColor functions.
+
+local function stringToColorTable(s, toHDR, isHDR)
+	if (type(s) == "string") then
+		s = trim(s, true)
+		if (s) then
+			s = split(s, ",")
+
+			local maxVal = 255	-- RGB max
+			--[[
+			local valSum = ( tonumber(s[1]) or 0) + (tonumber(s[2]) or 0) + (tonumber(s[3]) or 0)
+			if ( isHDR or  ( valSum > 0 and valSum <= 3 ) ) then
+				maxVal = 1	-- HDR max
+			end
+			--]]
+			
+			local opacity = lower(s[4] or maxVal)
+			if ( opacity == "opaque" ) then
+				s[4] = maxVal
+			elseif (opacity == "transparent") then
+				s[4] = 0
+			else
+				s[4] = applyPercent(s[4], maxVal) or maxVal
+			end
+			-- force numeric
+			for i,j in pairs(s) do
+				s[i] = tonumber(j)
+				s[i] = applyPercent(j,maxVal) or maxVal
+			end
+			
+			if (toHDR) then
+				s = { s[1]/255, s[2]/255, s[3]/255, s[4]/255 }
+			end
+		end
+	end
+	return s
+end
+
+-- *** Apparently, not necessary! I built this due to a bug in the dmc_kolor patch.
+-- Here's a shortcut for getting an HDR color from RGB or HDR values
+-- Set isHDR to true if the input string uses HDR values
+local function stringToColorTableHDR(s, isHDR)
+	return stringToColorTable(s, true, isHDR)
+end
+
+
 -------------------------------------------------
 -- Darken the screen
 -- by drawing a dark opaque rectangle over it.
@@ -1338,17 +1466,16 @@ end
 -- factor, to adjust the screen image.
 -- locked: default is no lock, if true then lock the screen from touches
 -------------------------------------------------
-local function dimScreen(transitionTime, color, opacity, scaling, locked)
+local function dimScreen(transitionTime, color, scaling, locked)
 
 	transitionTime = transitionTime or 300
-	color = color or "55,55,55"
 	opacity = applyPercent(opacity,1) or 190/255
 	scaling = scaling or 1
-	local c = split(color, ",")
+	local c = stringToColorTable(color or "55,55,55,75%")
 	-- cover all rect, darken background
 	local bkgdrect = display.newRect(0,0,screenW,screenH)
-	bkgdrect:setFillColor( c[1], c[2], c[3])
-	bkgdrect.alpha = 0
+	bkgdrect.x, bkgdrect.y = midscreenX, midscreenY
+	bkgdrect:setFillColor( unpack(c) )
 	bkgdrect:scale(1/scaling, 1/scaling)
 	transition.to (bkgdrect, {alpha=opacity, time=transitionTime } )
 
@@ -2388,7 +2515,7 @@ end
 
 local function callClean ( moduleName )
 	if type(package.loaded[moduleName]) == "table" then
-		if string.lower(moduleName) ~= "main" then
+		if lower(moduleName) ~= "main" then
 			for k,v in pairs(package.loaded[moduleName]) do
 				if k == "clean" and type(v) == "function" then
 					package.loaded[moduleName].clean()
@@ -2912,7 +3039,7 @@ local function loadTextStyles(filename, path)
 					v = "set,"..v
 					-- Record both Mixed Case and lowercase versions of the key
 					-- to be sure we can find it.
-					t[string.lower(n)] = split(v, ",", true)
+					t[lower(n)] = split(v, ",", true)
 					t[n] = split(v, ",", true)
 				end
 			end
@@ -3318,10 +3445,10 @@ local function positionObjectWithReferencePoint(x,y,w,h,margins, absoluteflag, r
 	local yref = "Top"
 
 	if (type(x) == "string") then
-		x = string.lower(x)
+		x = lower(x)
 	end
 	if (type(y) == "string") then
-		y = string.lower(y)
+		y = lower(y)
 	end
 
 	-- Horizontal offsets
@@ -3371,7 +3498,7 @@ end
 
 
 local function setAnchorFromReferencePoint(obj, pos)
-	pos = string.lower(pos)
+	pos = lower(pos)
 	
 	if 	   pos == "topleftreferencepoint"      then obj.anchorX, obj.anchorY = 0, 0
 	elseif pos == "topcenterreferencepoint"    then obj.anchorX, obj.anchorY = 0.5, 0
@@ -3410,7 +3537,7 @@ local function reanchorToCenter (obj, a, x, y)
 	
 	if not a then return x,y; end
 	
-	if (string.lower(a) == "centerreferencepoint") then
+	if (lower(a) == "centerreferencepoint") then
 		return x,y
 	end
 		
@@ -3445,96 +3572,6 @@ local function reanchorToCenter (obj, a, x, y)
 	
 	return x,y
 	
-end
-
-
-
---------------
---- Check that a key in table 1 exists in table 2.
--- Useful for making sure the a setting value in the user settings is correctly named.
--- example: keysExistInTable(usersettings,settings)
-local function keysExistInTable(t1,t2)
-	for k,v in pairs (t1) do
-		if (type(v) == "table") then
-			for kk,vv in pairs (v) do
-				if (t2[k] == nil or t2[k][kk] == nil) then
-					print ("WARNING: '"..k.." . "..kk.." is an unknown key.")
-				end
-			end
-		end
-	end
-
-end
-
-
---- Check if a value is in a table
--- Same as in_array(myarray, value)
-local function inTable(needle, haystack) -- find element v of haystack satisfying f(v)
-	if (haystack and type(haystack) == "table") then
-		for _, v in ipairs(haystack) do
-			if ( v == needle ) then
-				return v
-			end
-		end
-	end
-	return nil
-end
-
---------------
--- A Handy way to store an RGB or RGBA color is as a string, e.g. "250,250,10,50%"
--- The 4th value is an alpha, 0-255, or OPAQUE or TRANSPARENT
--- This returns a table from such a string.
--- If given a table, this does nothing (in case the value was already converted somewhere!)
---
--- If any value is between 0 & 1, then we must be dealing with HDR values, not RGB values
--- e.g. 0,0,2 must be RGB, but 0,0,0.1 must be HDR.
--- We only have a problem when the highest value is 1, but when would anyone use an RGB value of 1? Never.
--- Therefore, if all values <= 1 then it's and HDR value.
---
--- If toHDR, then force the result to be HDR. This is useful for widgets and other libraries
--- that don't let us redefine their display.setFillColor functions.
-
-local function stringToColorTable(s, toHDR, isHDR)
-	if (type(s) == "string") then
-		s = trim(s, true)
-		if (s) then
-			s = split(s, ",")
-
-			local maxVal = 255	-- RGB max
-			--[[
-			local valSum = ( tonumber(s[1]) or 0) + (tonumber(s[2]) or 0) + (tonumber(s[3]) or 0)
-			if ( isHDR or  ( valSum > 0 and valSum <= 3 ) ) then
-				maxVal = 1	-- HDR max
-			end
-			--]]
-			
-			local opacity = string.lower(s[4] or maxVal)
-			if ( opacity == "opaque" ) then
-				s[4] = maxVal
-			elseif (opacity == "transparent") then
-				s[4] = 0
-			else
-				s[4] = applyPercent(s[4], maxVal) or maxVal
-			end
-			-- force numeric
-			for i,j in pairs(s) do
-				s[i] = tonumber(j)
-				s[i] = applyPercent(j,maxVal) or maxVal
-			end
-			
-			if (toHDR) then
-				s = { s[1]/255, s[2]/255, s[3]/255, s[4]/255 }
-			end
-		end
-	end
-	return s
-end
-
--- *** Apparently, not necessary! I built this due to a bug in the dmc_kolor patch.
--- Here's a shortcut for getting an HDR color from RGB or HDR values
--- Set isHDR to true if the input string uses HDR values
-local function stringToColorTableHDR(s, isHDR)
-	return stringToColorTable(s, true, isHDR)
 end
 
 ----------------------------------------------------------------------
@@ -3608,6 +3645,7 @@ local function flashscreen(t,a)
 	t = t or 100
 	a = a or 0.5
 	local r = display.newRect(0,0,screenW,screenH)
+	anchorTopLeftZero(r)
 	r.alpha = 0
 
 		local function removeFlasher()
@@ -3885,6 +3923,13 @@ end
 -- Useful to join pieces together, e.g. server + path + filename
 -- If username/password are passed, add them to the URL, e.g. username:password@restofurl
 local function joinAsPath( pieces, username, password)
+	trim(pieces)
+	for i = #pieces, 1, -1 do
+		if (pieces[i] == nil or pieces[i] == "") then 
+			table.remove(pieces, i)
+		end
+	end
+
 	local path = cleanPath(table.concat(pieces, "/"))
 	local pre = table.concat({username,password},":")
 	if (pre ~= "") then
@@ -4463,10 +4508,10 @@ end
 -- Default with no values is to return the default book.
 -- @param	locations	Table: { 1 = { path = "path/to/book/folders", bookDir = "bookfolder", systemDirectory = system.ResourceDirectory }, ... }
 -- Example:
--- findFile ( "book.xml", "_user/books/" , "_user" )
+-- findFile ( "book.xml", "_user/books" , "_user" )
 -- ====================================================================
 local function findFile (filename, locations, default)
-	
+
 	default = default or "_user"
 	if (not filename or not locations or type(locations) ~= "table") then
 		return { path = default, systemDirectory = system.ResourceDirectory }
@@ -4474,15 +4519,54 @@ local function findFile (filename, locations, default)
 	
 	local p
 	for i,loc in pairs(locations) do
-		--print ("Look for ", filename, "in", loc.path .. loc.bookDir)
-			
-		if ( fileExists( loc.path.. loc.bookDir .. "/" .. filename, loc.systemDirectory) ) then
+
+		if (loc.bookDir == "default" or loc.bookDir == "" ) then
+			return default, system.ResourceDirectory
+		end
+	
+
+		--print ("Look for ", joinAsPath{loc.path, loc.bookDir, filename} )
+		if ( fileExists( joinAsPath{loc.path, loc.bookDir, filename}, loc.systemDirectory) ) then
 			--print ("Found ", filename, "in", loc.path .. loc.bookDir)
 			return loc.path, loc.systemDirectory
+		else
+			--print ("NOT FOUND AT ", joinAsPath{loc.path, loc.bookDir, filename})
 		end
 	end
 	return false
 end
+
+
+
+
+-- ====================================================================
+-- Set case of some text using CSS case names,
+--none	No capitalization. The text renders as it is. This is default
+--capitalize	Transforms the first character of each word to uppercase
+--uppercase	Transforms all characters to uppercase
+--lowercase	Transforms all characters to lowercase
+--initial	Sets this property to its default value. Read about initial
+--inherit	Inherits this property from its parent element.
+--
+-- Synonyms : title, normal
+-- ====================================================================
+local function setCase(case, str)
+	if case and case ~= "" then
+		case = lower(trim(case))
+		if (case == "lowercase") then
+			str = lower(str)
+		elseif (case == "uppercase") then
+			str = upper(str)
+		elseif (case == "capitalize" or case == "title") then
+			-- turns out we added this earlier to FUNX
+			str = capitalize(str)
+		end
+	end
+	return str
+end
+
+
+
 
 -- ====================================================================
 -- Register new functions here
@@ -4556,6 +4640,7 @@ FUNX.hasFieldCodesSingle = hasFieldCodesSingle
 FUNX.hasNetConnection = hasNetConnection
 FUNX.hideObject = hideObject
 FUNX.hideSpinner = hideSpinner
+FUNX.indexOfSystemDirectory = indexOfSystemDirectory
 FUNX.initSystemEventHandler = initSystemEventHandler
 FUNX.inTable = inTable
 FUNX.isPercent  = isPercent 
@@ -4610,6 +4695,7 @@ FUNX.saveTableToFile = saveTableToFile
 FUNX.scaleFactorForRetina = scaleFactorForRetina
 FUNX.scaleObjectToMargins  = scaleObjectToMargins 
 FUNX.ScaleObjToSize  = ScaleObjToSize 
+FUNX.setCase = setCase
 FUNX.setFillColorFromString = setFillColorFromString
 FUNX.setTextStyles  = setTextStyles 
 FUNX.showContentToLocal = showContentToLocal
@@ -4638,6 +4724,7 @@ FUNX.tellUser = tellUser
 FUNX.timePassed = timePassed
 FUNX.toggleObject = toggleObject
 FUNX.toZero = toZero
+FUNX.traceback = traceback
 FUNX.translateHTMLEntity = translateHTMLEntity
 FUNX.trim = trim
 FUNX.undimScreen = undimScreen

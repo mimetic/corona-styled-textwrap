@@ -57,6 +57,13 @@ local find = string.find
 local floor = math.floor
 local gfind = string.gfind
 
+-- shortcuts to my functions
+local trim = funx.trim
+local stringToColorTable = funx.stringToColorTable
+local split = funx.split
+local setCase = funx.setCase
+
+
 
 -- Useful constants
 local OPAQUE = 255
@@ -155,7 +162,7 @@ local inline = {
 -- 12pt => 132/72 * 12pt => 24px
 --------------------------------------------------------
 local function convertValuesToPixels (t, deviceMetrics)
-	t = funx.trim(t)
+	t = trim(t)
 	local _, _, n = find(t, "^(%d+)")
 	local _, _, u = find(t, "(%a%a)$")
 
@@ -198,7 +205,6 @@ local function getTagFormatting(fontFaces, tag, currentfont, variation, attr)
 	variation = variation or ""
 
 	local format = {}
-
 	if (tag == "em" or tag == "i") then
 		if (variation == "Bold" or variation == "BoldItalic") then
 			format.font = getFontFace (basefont, "-BoldItalic")
@@ -206,6 +212,7 @@ local function getTagFormatting(fontFaces, tag, currentfont, variation, attr)
 		else
 			format.font = getFontFace (basefont, "-Italic")
 			format.fontvariation = "Italic"
+--print (basefont, format.font)
 		end
 	elseif (tag == "strong" or tag == "b") then
 		if (variation == "Italic" or variation == "BoldItalic") then
@@ -222,9 +229,9 @@ local function getTagFormatting(fontFaces, tag, currentfont, variation, attr)
 	elseif (attr) then
 		-- get style info
 		local style = {}
-		local p = funx.split(attr.style, ";", true) or {}
+		local p = split(attr.style, ";", true) or {}
 		for i,j in pairs( p ) do
-			local c = funx.split(j,":",true)
+			local c = split(j,":",true)
 			if (c[1] and c[2]) then
 				style[c[1]] = c[2]
 			end
@@ -275,14 +282,17 @@ end
 --------------------------------------------------------
 -- CACHE of textwrap!!!
 --------------------------------------------------------
-local function saveTextWrapToCache(id, cache, cacheDir)
+local function saveTextWrapToCache(id, cache, baselineCache, cacheDir)
 	if (cacheDir and cacheDir ~= "") then
 		funx.mkdirTree (cacheDir .. "/" .. textWrapCacheDir, system.CachesDirectory)
 		--funx.mkdir (cacheDir .. "/" .. textWrapCacheDir, "",false, system.CachesDirectory)
 		-- Developing: delete the cache
+		
+		-- Add in the baseline cache
+		local c = { wrapCache = cache, baselineCache = baselineCache }
 		if (true) then
 			local fn =  cacheDir .. "/" .. textWrapCacheDir .. "/" ..  id .. ".json"
-			funx.saveTable(cache, fn , system.CachesDirectory)
+			funx.saveTable(c, fn , system.CachesDirectory)
 		end
 	end
 end
@@ -292,11 +302,10 @@ local function loadTextWrapFromCache(id, cacheDir)
 	if (cacheDir) then
 		local fn = cacheDir .. "/" .. textWrapCacheDir .. "/" ..  id .. ".json"
 
-		local p = {}
 		if (funx.fileExists(fn, system.CachesDirectory)) then
-			p = funx.loadTable(fn, system.CachesDirectory)
+			local c = funx.loadTable(fn, system.CachesDirectory)
 --print ("cacheTemplatizedPage: found page "..fn )
-			return p
+			return c
 		end
 	end
 	return false
@@ -397,6 +406,53 @@ local function attachLinkToObj(obj, attr, handler)
 	obj:addEventListener( "touch", comboListener )
 end
 
+
+
+
+------------------------------------------------
+-- Get the ascent of a font, which is how we position text.
+-- Set InDesign to position from the box top using leading
+------------------------------------------------
+local function getFontAscent(baselineCache, font, size)
+	
+	local baseline, baselineAdjustment, ascent
+
+	if (baselineCache[font] and baselineCache[font][size]) then
+			baseline, baselineAdjustment, ascent = unpack(baselineCache[font][size])
+--print ("GetFontAscent CACHE", font, size, ":",baseline, baselineAdjustment, ascent)
+	else
+
+		local fontInfo = fontMetrics.getMetrics(font)
+
+		-- Get the iOS bounding box size for this particular font!!!
+		-- This must be done for each size and font, since it changes unpredictably
+		local samplefont = display.newText("X", 0, 0, font, size)
+		local boxHeight = samplefont.height
+		samplefont:removeSelf()
+		samplefont = nil
+
+		-- Set the new baseline from the font metrics
+		baseline = boxHeight + (size * fontInfo.descent)
+		
+		--local yAdjustment = (settings.size * fontInfo.capheight) - baseline
+		ascent = fontInfo.ascent * size
+		
+		-- This should adjust the font above/below the baseline to reflect differences in fonts,
+		-- putting them all on the same line.
+		baselineAdjustment = -(size * fontInfo.descent)
+
+		if (not baselineCache[font]) then
+			baselineCache[font] = {}
+		end
+		baselineCache[font][size] = { baseline, baselineAdjustment, ascent }
+	end
+	return baseline, baselineAdjustment, ascent
+end
+
+
+
+
+
 --------------------------------------------------------
 -- Wrap text to a width
 -- Blank lines are ignored.
@@ -482,16 +538,21 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local cache = { { text = "", width = "", } }
 	local cacheIndex = 1
 	
+	-- Cache of font baselines for different sizes, as drawing on screen
+	baselineCache = {}
+	
 	-- Interpret the width so we can get it right caching:
 	width = funx.percentOfScreenWidth(width) or display.contentWidth
 
 	if ( cacheDir and cacheDir ~= "" ) then
 		textUID = "cache"..funx.checksum(text).."_"..tostring(width)
-		local res = loadTextWrapFromCache(textUID, cacheDir)
-		if (res) then
+		local c = loadTextWrapFromCache(textUID, cacheDir)
+		if (c) then
 			textwrapIsCached = true
-			cache = res
+			cache = c.wrapCache
+			baselineCache = c.baselineCache
 			--print ("***** CACHE LOADED")
+			--funx.dump(cache)
 		end
 	end
 
@@ -609,7 +670,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	settings.width = width
 	settings.opacity = funx.applyPercent(opacity, OPAQUE) or OPAQUE
 	settings.targetDeviceScreenSize = targetDeviceScreenSize or screenW..","..screenH
-	settings.case = "NORMAL"
+	settings.case = "none"
+	settings.decoration = "none"
 	settings.spaceBefore = 0
 	settings.spaceAfter = 0
 	settings.firstLineIndent = 0
@@ -740,7 +802,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 		-- This depends on the closure for variables, such as font, size, etc.
 		local function setStyleFromCommandLine (params)
 			-- font
-			if (params[2] and params[2] ~= "") then settings.font = funx.trim(params[2]) end
+			if (params[2] and params[2] ~= "") then settings.font = trim(params[2]) end
 			-- font size
 			if (params[3] and params[3] ~= "") then
 				settings.size = tonumber(params[3])
@@ -776,7 +838,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			--if (params[9] and params[9] ~= "") then settings.opacity = funx.applyPercent(params[9], OPAQUE) end
 			settings.opacity = 1.0
 			-- case (upper/normal)
-			if (params[10] and params[10] ~= "") then settings.case = funx.trim(params[10]) end
+			if (params[10] and params[10] ~= "") then settings.case = lower(trim(params[10])) end
 
 			-- space before paragraph
 			if (params[12] and params[12] ~= "") then settings.spaceBefore = tonumber(params[12]) end
@@ -820,12 +882,12 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			end
 			-- font
 			if (format.font) then
-				settings.font = funx.trim(format.font)
+				settings.font = trim(format.font)
 				settings.fontvariation = format.fontvariation
 			end
 			-- font with CSS:
 			if (format['font-family']) then
-				settings.font = funx.trim(format['font-family'])
+				settings.font = trim(format['font-family'])
 				settings.fontvariation = format.fontvariation
 			end
 
@@ -858,7 +920,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			-- We're using decimal, e.g. 12,24,55 not hex (#ffeeff)
 			if (format.color) then
 				local _, _, c = find(format.color, "%((.*)%)")
-				local s = funx.stringToColorTable(c)
+				local s = stringToColorTable(c)
 				if (s) then
 					settings.color = { s[1], s[2], s[3], s[4] }
 				end
@@ -880,16 +942,19 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			-- Now built into the color, e.g. RGBa color
 			--if (format.opacity) then settings.opacity = funx.applyPercent(format.opacity, OPAQUE) end
 
-			-- case (upper/normal) using legacy coding ("case")
+			-- case (upper/normal) using *legacy* coding ("case")
 			if (format.case) then
-				settings.case = lower(funx.trim(format.case))
-				if (case == "none") then
-					settings.case = "normal"
-				end
+				settings.case = lower(trim(format.case))
 			end
 
 			-- case, using CSS, e.g. "text-transform:uppercase"
-			if (format['text-transform']) then settings.case = funx.trim(format.case) end
+			if (format["text-transform"]) then settings.case = lower(trim(format["text-transform"])) end
+			-- Fix legacy "normal" setting, which in CSS is "none"
+			if settings.case == "normal" then settings.case = "none"; end
+
+			if (format["text-decoration"]) then 
+				settings.decoration = lower(trim(format["text-decoration"])) 
+			end
 
 			-- space before paragraph
 			if (format['margin-top']) then settings.spaceBefore = convertValuesToPixels(format['margin-top'], settings.deviceMetrics) end
@@ -928,6 +993,41 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			if (format['bullet']) then
 				settings.bullet = format['bullet'] or "&#9679;"
 			end
+			
+			
+			------------------------------------------------
+			-- Refigure font metrics if font has changed
+			------------------------------------------------
+			if (settings.font ~= prevFont or settings.size ~= prevSize) then
+
+				if ( baselineCache[settings.font] and baselineCache[settings.font][settings.size] ) then
+					baseline = baselineCache[settings.font][settings.size]
+				else
+					-- ALIGN TOP OF TEXT FRAME TO CAP HEIGHT!!!
+					-- If this is the first line in the block of text, DON'T apply the space before settings
+					-- Tell the function which called this to raise the entire block to the cap-height
+					-- of the first line.
+					--[[
+					fontInfo = fontMetrics.getMetrics(settings.font)
+
+					-- Get the iOS bounding box size for this particular font!!!
+					-- This must be done for each size and font, since it changes unpredictably
+					local samplefont = display.newText("X", 0, 0, settings.font, settings.size)
+					local boxHeight = samplefont.height
+					samplefont:removeSelf()
+					samplefont = nil
+
+					-- Set the new baseline from the font metrics
+					baseline = boxHeight + (settings.size * fontInfo.descent)
+					--]]
+					baseline, baselineAdjustment, ascent = getFontAscent(baselineCache, settings.font, settings.size)
+				end
+				prevFont = settings.font
+				prevSize = settings.size
+			end
+			
+			
+			
 		end
 
 
@@ -979,7 +1079,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local t1 = text
 	if (settings.isHTML) then
 		--print ("Autowrap: line 500 : text is HTML!")
-		text = funx.trim(text:gsub("[\n\r]",""))
+		text = trim(text:gsub("[\n\r]",""))
 	end
 
 	-- Be sure the text block ends with a return, so the line chopper below finds the last line!
@@ -1022,7 +1122,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			lineBreakType = "hard"
 		end
 
-		line = funx.trim(line)
+		line = trim(line)
 
 		-----------------------------------------
 		-- COMMAND LINES:
@@ -1032,8 +1132,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 		if (currentLine == "" and substring(line,1,3) == "###") then
 			currentLine = ''
 			commandline = substring(line,4,-1)	-- get end of line
-			local params = funx.split(commandline, ",", true)
-			command = funx.trim(params[1])
+			local params = split(commandline, ",", true)
+			command = trim(params[1])
 			if (command == "reset") then
 				settings.font = defaultSettings.font
 				settings.size = defaultSettings.size
@@ -1176,24 +1276,13 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 
 				local fontInfo = fontMetrics.getMetrics(settings.font)
 				local currentLineHeight = lineHeight
-				local baselineAdjustment = 0
 
-				-- Get the iOS bounding box size for this particular font!!!
-				-- This must be done for each size and font, since it changes unpredictably
-				local samplefont = display.newText("X", 0, 0, settings.font, settings.size)
-				local boxHeight = samplefont.height
-				samplefont:removeSelf()
-				samplefont = nil
+				baseline, baselineAdjustment, ascent = getFontAscent(baselineCache, settings.font, settings.size)
 
-				-- boxHeight used size, so it is correct here.
-				local baseline = boxHeight + (settings.size * fontInfo.descent)
 
 				-- change case
-				if (case) then
-					settings.case = lower(case)
-					if (case == "all_caps" or settings.case == "uppercase") then
-						restOLine = string.upper(restOLine)
-					end
+				if (settings.case == "all_caps" or settings.case == "uppercase") then
+					restOLine = string.upper(restOLine)
 				end
 
 				-- If something is too high, it is turned into a scrolling text block, so this
@@ -1272,28 +1361,6 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 					-- Init stacks
 					stacks = stacks or { list = { ptr = 1 } }
 
-					------------------------------------------------
-					-- Get the ascent of a font, which is how we position text.
-					-- Set InDesign to position from the box top using leading
-					------------------------------------------------
-					local function getFontAscent(font, size)
-						local fontInfo = fontMetrics.getMetrics(font)
-
-						-- Get the iOS bounding box size for this particular font!!!
-						-- This must be done for each size and font, since it changes unpredictably
-						local samplefont = display.newText("X", 0, 0, font, size)
-						local boxHeight = samplefont.height
-						samplefont:removeSelf()
-						samplefont = nil
-
-						-- Set the new baseline from the font metrics
-						local baseline = boxHeight + (size * fontInfo.descent)
-						--local yAdjustment = (settings.size * fontInfo.capheight) - baseline
-						local ascent = fontInfo.ascent * size
-						local baselineAdjustment = floor((size * fontInfo.capheight) - baseline)
-						return 0
-					end
-
 
 
 
@@ -1303,6 +1370,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 					-- NOT a <p>, but perhaps something inside <p></p>
 					------------------------------------------------------------
 					local function renderParsedElement(elementNum, element, tag, attr)
+
 
 
 							local tempLineWidth, words
@@ -1317,8 +1385,10 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 							local tempLine, allTextInLine
 							local xOffset = 0
 							local wordlen = 0
-
-
+							local baseline = 0
+							local baselineAdjustment = 0
+							local ascent = 0
+							
 							-- ----------------------------------------------------------
 							-- <A> tag box. If we make the text itself touchable, it is easy to miss it...your touch
 							-- goes through the white spaces around letter strokes!
@@ -1354,7 +1424,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 								local ta = lower(textAlignment)
 
 								if (ta == "center") then
-									t = funx.trim(t)
+									t = trim(t)
 								elseif (ta == "right") then
 									t = funx.rtrim(t)
 								else
@@ -1394,7 +1464,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 
 
 
-
+							baseline, baselineAdjustment, ascent = getFontAscent(baselineCache, settings.font, settings.size)
 
 							-- flag to indicate the text line to be rendered is the last line of the previously
 							-- rendered text (true) or is the continuation of that text (false)
@@ -1421,21 +1491,9 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 							-- Refigure font metrics if font has changed
 							------------------------------------------------
 							if (settings.font ~= prevFont or settings.size ~= prevSize) then
-								-- ALIGN TOP OF TEXT FRAME TO CAP HEIGHT!!!
-								-- If this is the first line in the block of text, DON'T apply the space before settings
-								-- Tell the function which called this to raise the entire block to the cap-height
-								-- of the first line.
-								fontInfo = fontMetrics.getMetrics(settings.font)
 
-								-- Get the iOS bounding box size for this particular font!!!
-								-- This must be done for each size and font, since it changes unpredictably
-								local samplefont = display.newText("X", 0, 0, settings.font, settings.size)
-								local boxHeight = samplefont.height
-								samplefont:removeSelf()
-								samplefont = nil
+								baseline, baselineAdjustment, ascent = getFontAscent(baselineCache, settings.font, settings.size)
 
-								-- Set the new baseline from the font metrics
-								baseline = boxHeight + (settings.size * fontInfo.descent)
 								prevFont = settings.font
 								prevSize = settings.size
 							end
@@ -1450,7 +1508,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 							------
 							-- Calc the adjustment so we position text at its baseline, not top-left corner
 							-- For rendering using Reference Point TopLeft
-							baselineAdjustment = 0
+							--baselineAdjustment = 0
 
 							------------------------------------------------
 							-- RENDER TEXT OBJECT
@@ -1480,7 +1538,10 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 							-- If the line wrapping is cached, get it
 							if (textwrapIsCached) then
 								cachedChunk = cache[cacheIndex]
+print ("cacheIndex",cacheIndex)
+funx.dump(cache[cacheIndex])
 								--words = gmatch(cachedChunk.text, "[^\r\n]+")
+								cachedChunk = cachedChunk or { text = {}, item = {}, }
 								words = iteratorOverCacheText(cachedChunk.text)
 							else
 								cachedChunk = newCacheChunk()
@@ -1545,6 +1606,8 @@ if (textwrapIsCached) then
 
 								local newDisplayLineGroup = display.newGroup()
 								--newDisplayLineGroup.anchorChildren = true
+								
+								text = setCase(settings.case, text)
 								
 								local newDisplayLineText = display.newText({
 									parent = newDisplayLineGroup,
@@ -1617,6 +1680,8 @@ else
 									--currentLine = word
 								end
 								allTextInLine = prevTextInLine .. tempLine
+								
+								tempLine = setCase(settings.case, tempLine)
 
 								-- Grab the first words of the line, until "minLineCharCount" hit
 								if (textwrapIsCached or (strlen(allTextInLine) > settings.minLineCharCount)) then
@@ -1740,7 +1805,7 @@ else
 													if (not textwrapIsCached) then
 														-- Works for left-aligned...right is a mess anyway.
 														if (renderTextFromMargin or isFirstLine) then
-															currentLine = funx.trim(currentLine)
+															currentLine = trim(currentLine)
 														end
 														currentLine = trimByAlignment(currentLine)
 														--cachedChunk.text[cachedChunkIndex] = currentLine
@@ -2129,11 +2194,10 @@ end
 
 								result:insert(newDisplayLineGroup)
 								newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
-								newDisplayLineGroup.x, newDisplayLineGroup.y = x, lineY
+								newDisplayLineGroup.x = x
+								newDisplayLineGroup.y = lineY + baselineAdjustment
 
 								positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
-
-								newDisplayLineGroup.y = lineY + baselineAdjustment
 
 								-- We don't know if we have added a line...this text might be inside another line.
 								-- So we don't increment line count
@@ -2439,7 +2503,7 @@ end
 	result.yAdjustment = yAdjustment
 	--print ("textDisplayReferencePoint",textDisplayReferencePoint)
 
-	saveTextWrapToCache(textUID, cache, cacheDir)
+	saveTextWrapToCache(textUID, cache, baselineCache, cacheDir)
 
 	return result
 end
