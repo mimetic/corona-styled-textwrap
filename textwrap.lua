@@ -1392,6 +1392,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 							-- ----------------------------------------------------------
 							-- <A> tag box. If we make the text itself touchable, it is easy to miss it...your touch
 							-- goes through the white spaces around letter strokes!
+							-- This also should let us position text in a space, e.g. centered?
 							local function createLinkingBox(newDisplayLineGroup, newDisplayLineText, textDisplayReferencePoint, alttext, testBkgdColor )
 
 								testBkgdColor = testBkgdColor or {250,250,100,30}
@@ -1538,8 +1539,6 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 							-- If the line wrapping is cached, get it
 							if (textwrapIsCached) then
 								cachedChunk = cache[cacheIndex]
-print ("cacheIndex",cacheIndex)
-funx.dump(cache[cacheIndex])
 								--words = gmatch(cachedChunk.text, "[^\r\n]+")
 								cachedChunk = cachedChunk or { text = {}, item = {}, }
 								words = iteratorOverCacheText(cachedChunk.text)
@@ -2198,6 +2197,14 @@ end
 								newDisplayLineGroup.y = lineY + baselineAdjustment
 
 								positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
+
+								-- For allowing centered/right text to be positioned on the line:
+								local ta = lower(textAlignment)
+								if (ta == "center" or ta=="right") then
+									local q = display.newRect(newDisplayLineGroup, 0,0,settings.width, 1)
+									q.isVisible = false
+								end
+
 
 								-- We don't know if we have added a line...this text might be inside another line.
 								-- So we don't increment line count
