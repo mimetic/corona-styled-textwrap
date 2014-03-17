@@ -682,26 +682,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	settings.minLineCharCount = minCharCount or 5
 	settings.maxHeight = tonumber(maxHeight) or 0
 
-	------ POSITIONING RECT
-	-- Need a positioning rect so that indents work.
-	-- Width must be full-width so the right-justified works.
-	-- THIS HAS A PROBLEM...IF THE ALIGN IS CENTER BUT THE TEXT LINE REALLY ISN'T CENTER,
-	-- THIS WILL FAIL. SO, IF THE "ALIGN" IS SET TO CENTER, FOR SOME LEGACY REASON, BUT THE FIRST
-	-- LINE IS OTHERWISE, THIS WILL FAIL. FUCK.
-	--local r = display.newRect(0,0,width,10)
-	--[[
-	local r = display.newRect(0,0,5,5)
-	r:setFillColor(255,0,0,OPAQUE)
-	result:insert(r)
-	result._positionRect = r
-	r.strokeWidth=0
-	r.anchorX, r.anchorY = 0,0
-	r.x = 0
-	r.y = 0
-	r.isVisible = testing
-	--]]
-
-
  	lineHeight = funx.applyPercent(lineHeight, settings.size) or floor(settings.size * 1.3)
 
 	-- Scaling for device
@@ -1219,19 +1199,10 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				local result = display.newGroup()
 				--result.anchorChildren = true
 
-if (not settings.width) then print ("textwrap: line 844: Damn, the width is wacked"); end
+if (not settings.width) then print ("WARNING: textwrap: line 844: Damn, the width is wacked"); end
 
 
 				settings.width = settings.width or 300
-				--[[
-				local r = display.newRect(0,0,width,2)
-				r:setFillColor(100,250,0)
-				result:insert(r)
-				r:setReferencePoint(display.TopLeftReferencePoint)
-				r.x = 0
-				r.y = 0
-				r.isVisible = testing
-				--]]
 
 				-- Set text alignment
 				local textDisplayReferencePoint
@@ -1285,21 +1256,6 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 					restOLine = string.upper(restOLine)
 				end
 
-				-- If something is too high, it is turned into a scrolling text block, so this
-				-- doesn't apply:
-					-- Don't bother to render longer than the screen!
-					--if (lineY > (2*screenH) ) then
-						--print ("WARNING: (textwrap.lua) : tried to render text more than 2x higher than screen.")
-						--[[
-						--print ("Here is a sample : ", substring(line, 50) )
-
-						result:setReferencePoint(display.CenterReferencePoint)
-						result.yAdjustment = yAdjustment
-						return result
-						--]]
-					--end
-
-
 				-- Width of the text column (not including indents which are paragraph based)
 				local currentWidth = settings.width
 				--local currentWidth = width - settings.leftIndent - settings.rightIndent - settings.currentFirstLineIndent
@@ -1352,8 +1308,12 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 				-- This function will render
 				------------------------------------------------------------
 				local function renderParsedText(parsedText, tag, attr, parseDepth, stacks)
-
+					
+					-- The rendered text with multiple lines in it
 					local result = display.newGroup()
+					
+					-- One line of text, can be moved left/right/center
+					local renderedLine = display.newGroup()
 
 					parseDepth = parseDepth or 0
 					parseDepth = parseDepth + 1
@@ -1370,8 +1330,6 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 					-- NOT a <p>, but perhaps something inside <p></p>
 					------------------------------------------------------------
 					local function renderParsedElement(elementNum, element, tag, attr)
-
-
 
 							local tempLineWidth, words
 							local firstWord = true
@@ -2372,7 +2330,7 @@ end
 						local e = renderParsedElement(1, t, "", "")
 						-- Add one to the element counter so the next thing won't be on a new line
 						elementCounter = elementCounter + 1
-						result:insert(e)
+						renderedLine:insert(e)
 					end
 
 
@@ -2388,23 +2346,30 @@ end
 							end
 
 							local e = renderParsedText(element, element._tag, element._attr, parseDepth, stacks)
-							result:insert(e)
+							renderedLine:insert(e)
 							e.anchorX, e.anchorY = 0, 0
 							setStyleSettings(saveStyleSettings)
+
 						else
 							if (not element) then
 								print ("***** WARNING, EMPTY ELEMENT**** ")
 							end
---print ("B-Tag",tag)
+print ("B-Tag",tag, element, currentXOffset)
 							local saveStyleSettings = getAllStyleSettings()
 							local e = renderParsedElement(n, element, tag, attr)
-							result:insert(e)
+							renderedLine:insert(e)
 							e.anchorX, e.anchorY = 0, 0
 							elementCounter = elementCounter + 1
 							setStyleSettings(saveStyleSettings)
 						end
 
 					end -- end for
+					
+
+print ("END OF LOOP")					
+					
+--renderedLine.anchorChildren = true
+result:insert(renderedLine)
 
 					-- Close tags
 					-- AFTER rendering (so add afterspacing!)
@@ -2414,7 +2379,39 @@ end
 						lineY = lineY + currentSpaceAfter
 						-- Reset the first line of paragraph flag
 						isFirstLine = true
-						--lineY = lineY + lineHeight + currentSpaceAfter
+						
+print ("RENDER P", textAlignment)
+--funx.addPosRect(result, true)
+
+funx.addPosRect(renderedLine, true)
+funx.frameGroup(renderedLine)					
+--renderedLine.anchorChildren = true
+--renderedLine.y = 0
+
+local ta = lower(textAlignment)
+
+if ( ta == "right" ) then
+	renderedLine.x = 0--settings.width
+	renderedLine.anchorX = 0
+
+elseif (ta == "center" ) then
+	renderedLine.x = settings.width/2
+	renderedLine.anchorX = 0.5
+
+else
+	renderedLine.x = 0
+	renderedLine.anchorX = 0
+
+end
+
+renderedLine.y = 0
+
+--local lineWidth = renderedLine.width
+
+
+
+						--renderedLine.x
+						
 						elementCounter = 1
 					elseif (tag == "li") then
 						setStyleFromTag (tag, attr)

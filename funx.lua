@@ -86,9 +86,28 @@ local function anchorCenter(o)
 end
 
 -----------
+-- Shortcut to set anchors to top-left
+local function anchorTopCenter(o)
+	o.anchorX, o.anchorY = 0.5, 0
+end
+
+-----------
 -- Shortcut to set anchors to top-left and x,y to 0,0
 local function anchorTopLeftZero(o)
 	o.anchorX, o.anchorY = 0,0
+	o.x, o.y  = 0,0
+end
+
+-----------
+-- Shortcut to set anchors to top-left and x,y to 0,0
+local function anchorTopRight(o)
+	o.anchorX, o.anchorY = 1,0
+end
+
+-----------
+-- Shortcut to set anchors to top-left and x,y to 0,0
+local function anchorTopRightZero(o)
+	o.anchorX, o.anchorY = 1,0
 	o.x, o.y  = 0,0
 end
 
@@ -100,9 +119,48 @@ local function anchorCenterZero(o)
 end
 
 -----------
+-- Shortcut to set anchors to center and x,y to 0,0
+local function anchorTopCenterZero(o)
+	o.anchorX, o.anchorY = 0.5, 0
+	o.x, o.y  = 0,0
+end
+
+-----------
+-- Shortcut to set anchors to top-left and x,y to 0,0
+local function anchorBottomLeft(o)
+	o.anchorX, o.anchorY = 0,1
+end
+
+-----------
+-- Shortcut to set anchors to top-left and x,y to 0,0
+local function anchorBottomLeftZero(o)
+	o.anchorX, o.anchorY = 0,1
+	o.x, o.y  = 0,0
+end
+
+-----------
+-- Shortcut to set anchors to top-left and x,y to 0,0
+local function anchorBottomRight(o)
+	o.anchorX, o.anchorY = 1,1
+end
+
+-----------
 -- Shortcut to set anchors to top-left and x,y to 0,0
 local function anchorBottomRightZero(o)
 	o.anchorX, o.anchorY = 1,1
+	o.x, o.y  = 0,0
+end
+
+-----------
+-- Shortcut to set anchors to top-left and x,y to 0,0
+local function anchorBottomCenter(o)
+	o.anchorX, o.anchorY = 0.5,1
+end
+
+-----------
+-- Shortcut to set anchors to top-left and x,y to 0,0
+local function anchorBottomCenterZero(o)
+	o.anchorX, o.anchorY = 0.5,1
 	o.x, o.y  = 0,0
 end
 
@@ -124,6 +182,8 @@ local function centerInParent(g)
 	g.y = g.parent.height/2
 return g
 end
+
+
 
 -- ------------------------------------------------------------
 -- Get index in system table of a system directory
@@ -1242,8 +1302,11 @@ local function loadImageFile(filename, wildcardPath, whichSystemDirectory, showT
 		end
 	
 		local i = display.newGroup()
-		local image = display.newImage(i, "_ui/missing-image.png", system.ResourceDirectory, true)
+		i.anchorChildren = true
+		anchorCenterZero(i)
 
+		local image = display.newImage(i, "_ui/missing-image.png", system.ResourceDirectory, true)
+		
 		-- Write to the log!
 		local syspath =  system.pathForFile( "", whichSystemDirectory )
 		--print ("loadImageFile: whichSystemDirectory", syspath )
@@ -1454,6 +1517,31 @@ end
 local function stringToColorTableHDR(s, isHDR)
 	return stringToColorTable(s, true, isHDR)
 end
+
+
+--===================================
+--- Frame a group by adding rectangle to a group, behind it.
+local function frameGroup(g, s, color)
+
+	local w,h = g.contentWidth or screenW, g.contentHeight or screenH
+
+	local r = display.newRect(g, 0, 0, w, h)
+	r.strokeWidth = s or 5
+
+	color = color or "255,0,0"
+
+	if (type(color) == "string") then
+		color = stringToColorTable(color)
+	end
+	r:setStrokeColor(unpack(color))
+	
+	r:setFillColor(255,0,0, 50)
+	
+	r:toBack()
+	r.anchorX, r.anchorY = 0, 0
+	r.x, r.y = 0,0
+end
+
 
 
 -------------------------------------------------
@@ -1756,10 +1844,13 @@ end
 -- Build a drop shadow
 ------------------------------------------------------------------------
 
-local function buildShadow1(w,h)
+local function buildShadow(w,h,sw,opacity)
 	local ceil = math.ceil
 	local shadow = display.newGroup()
-	shadow.anchorChildren = true
+
+--addPosRect(shadow,false)
+
+	--shadow.anchorChildren = true
 
 	--print ("buildShadow: ",w,h)
 
@@ -1767,16 +1858,31 @@ local function buildShadow1(w,h)
 	local tr = display.newImage(shadow, "_ui/shadow_tl.png")
 	local bl = display.newImage(shadow, "_ui/shadow_tl.png")
 	local br = display.newImage(shadow, "_ui/shadow_tl.png")
+	
+	-- Rotations make these non-obvious!
+	anchorTopLeftZero(tl)
+	anchorTopLeftZero(tr)
+	anchorTopRightZero(bl)
+	anchorBottomRightZero(br)
 
 	local left = display.newImage(shadow, "_ui/shadow_l.png")
 	local right = display.newImage(shadow, "_ui/shadow_l.png")
 	local top = display.newImage(shadow, "_ui/shadow_l.png")
 	local bottom = display.newImage(shadow, "_ui/shadow_l.png")
+	
+	anchorTopLeft(left)
+	anchorTopLeft(right)
+	anchorTopLeft(top)
+	anchorTopLeft(bottom)
 
-	local corner = tl.width
-	local cornerPad = corner/2
-	local edge = left.width
-	local edgePad = edge/2
+	anchorTopLeft(left)
+	anchorBottomLeft(right)
+	top.anchorX, top.anchorY = 0.5,1
+	bottom.anchorX, bottom.anchorY = 0.5,0
+
+	-- SIZING
+	local corner = sw
+	local edge = sw
 
 	-- Start with a solid rect
 	--local srect = display.newRect(shadow, corner,corner,w-(2*corner),h-(2*corner))
@@ -1784,9 +1890,9 @@ local function buildShadow1(w,h)
 	--srect:setFillColor( 0,0,0,70 )
 
 	local srect = display.newImage(shadow, "_ui/shadow_rect.png")
-	srect.width = w - (2*corner)
-	srect.height = h - (2*corner)
-	srect:setReferencePoint(display.TopLeftReferencePoint)
+	srect.width = w -- (2*corner)
+	srect.height = h -- (2*corner)
+	anchorTopLeft(srect)
 	srect.x = corner
 	srect.y = corner
 
@@ -1805,27 +1911,37 @@ local function buildShadow1(w,h)
 		print ("funx.buildShadow: ERROR! The shadow box is to small..I can't compute this one")
 	end
 	--scale
-	-- 50 = 20+20+3 is min side
 
-	local r = (h/2) / corner
-	if (r < 1) then
-		--print ("Resize to "..r)
+	corner = sw
+	cornerPad = sw/2
+	edge = sw
+	edgePad = sw/2
+
+	
+	local r = sw / tl.width
+
+	if (r>1) then
 		tl:scale(r,r)
 		tr:scale(r,r)
 		bl:scale(r,r)
 		br:scale(r,r)
+		
+		-- Rotations make this non-obvious, x,y get flipped!
+		top.width = sw
+		top.height = w
+		bottom.width = sw
+		bottom.height = w
 
-		top:scale(1,r)
-		bottom:scale(1,r)
-
-		corner = (corner * r)
-		cornerPad = (cornerPad * r)
-		edge = (edge * r)
-		edgePad = (edgePad * r)
+		left.width = sw
+		left.height = h
+		right.width = sw
+		right.height = h
 
 	end
 
-	if (r == 1) then
+
+
+	if (corner == h/2) then
 		display.remove(left)
 		left = nil
 
@@ -1842,13 +1958,13 @@ local function buildShadow1(w,h)
 	end
 
 	if (h > (2*corner) and left) then
-		left.height = h-40
-		right.height = h-40
+		--left.height = h-corner
+		--right.height = h-corner
 	end
 
 	if (w > (2*corner) and top) then
-		top.height = w-40
-		bottom.height = w-40
+		--top.height = sw
+		--bottom.height = w-corner
 	end
 
 	-- position
@@ -1865,21 +1981,25 @@ local function buildShadow1(w,h)
 	]]
 
 	if (top) then
-		top.x = w/2
+		top.x = corner
 		top.y = cornerPad
-		bottom.x = w/2
-		bottom.y = h-cornerPad
+		bottom.x = corner
+		bottom.y = h+ corner + cornerPad
 	end
 	if (left) then
-		left.y = h/2
-		right.x = w-cornerPad
-		right.y = h/2
+		left.x = 0
+		left.y = sw
+		right.x = w + 2*sw
+		right.y = sw
 	end
 
-	tr.x = w-cornerPad
-	bl.y = h-cornerPad
-	br.x = w-cornerPad
-	br.y = h-cornerPad
+	tr.x = w + 2*corner
+	tr.y = 0
+	
+	br.x = w + corner
+	br.y = h + corner
+
+	bl.y = h + corner
 
 	return shadow
 
@@ -1892,7 +2012,7 @@ end
 ------------------------------------------------------------------------
 
 
-local function buildShadow(w,h,sw,opacity)
+local function buildShadowNew(w,h,sw,opacity)
 
 	sw = sw or 20
 	local shadow = display.newSnapshot( w + 2*sw, h + 2*sw )
@@ -4419,7 +4539,7 @@ end
 local function getStatusBarHeight()
 	local t = display.topStatusBarContentHeight
 	if (t == 0) then
-		display.setStatusBar( display.DarkStatusBar )
+		display.setStatusBar( display.DefaultStatusBar )
 		t = display.topStatusBarContentHeight
 		display.setStatusBar( display.HiddenStatusBar )
 	end
@@ -4432,30 +4552,6 @@ local function deleteDirectoryContents(dir, whichSystemDirectory)
 	whichSystemDirectory = whichSystemDirectory or system.CachesDirectory
 	rmDir(dir, whichSystemDirectory, true)
 	--print ("deleteDirectoryContents", dir)
-end
-
-
---===================================
---- Frame a group by adding rectangle to a group, behind it.
-local function frameGroup(g, s, color)
-
-	local w,h = g.contentWidth or screenW, g.contentHeight or screenH
-
-	local r = display.newRect(g, 0, 0, w, h)
-	r.strokeWidth = s or 5
-
-	color = color or "255,0,0"
-
-	if (type(color) == "string") then
-		color = stringToColorTable(color)
-	end
-	r:setStrokeColor(unpack(color))
-	
-	r:setFillColor(255,0,0, 50)
-	
-	r:toBack()
-	r.anchorX, r.anchorY = 0, 0
-	r.x, r.y = 0,0
 end
 
 
@@ -4579,11 +4675,20 @@ FUNX.activityIndicatorOn = activityIndicatorOn
 FUNX.AddCommas = AddCommas
 FUNX.addPosRect = addPosRect
 FUNX.adjustXYforShadow  = adjustXYforShadow 
+FUNX.anchorBottomLeftZero = anchorBottomLeftZero
+FUNX.anchorBottomLeft = anchorBottomLeft
 FUNX.anchorBottomRightZero = anchorBottomRightZero
+FUNX.anchorBottomRight = anchorBottomRight
+FUNX.anchorBottomCenterZero = anchorBottomCenterZero
+FUNX.anchorBottomCenter = anchorBottomCenter
 FUNX.anchorCenter = anchorCenter
 FUNX.anchorCenterZero = anchorCenterZero
+FUNX.anchorTopCenter = anchorTopCenter
+FUNX.anchorTopCenterZero = anchorTopCenterZero
 FUNX.anchorTopLeft = anchorTopLeft
 FUNX.anchorTopLeftZero = anchorTopLeftZero
+FUNX.anchorTopRight = anchorTopRight
+FUNX.anchorTopRightZero = anchorTopRightZero
 FUNX.applyMask = applyMask
 FUNX.applyPercent  = applyPercent 
 FUNX.applyPercentIfSet = applyPercentIfSet

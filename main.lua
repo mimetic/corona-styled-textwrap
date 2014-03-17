@@ -46,7 +46,7 @@ local midscreenX = screenW*(0.5)
 local midscreenY = screenH*(0.5)
 
 local w = screenW/2
-w = 401
+w = 300
 
 local textStyles = funx.loadTextStyles("textstyles.txt", system.ResourceDirectory)
 
