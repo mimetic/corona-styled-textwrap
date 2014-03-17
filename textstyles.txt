@@ -1,8 +1,9 @@
 # style = font, size, leading, R,G,B, width, opacity, NORMAL|ALL_CAPS, text alignment, spaceBefore, spaceAfter, firstLineIndent, leftIndent, rightIndent
 Normal = Avenir,16,24, 0,0,0,,100%,NORMAL, left,0,0,0,0,0
 abnormal = Avenir,12,16, 0,0,0,,100%,NORMAL, left,20,20,20,0,0
-Right = Avenir,16,20,0,0,0,,100%,NORMAL,right,10,0,,0,0
-Center = Avenir,16,20,0,0,0,,100%,NORMAL,center,,,0,0,0
+Left = Avenir,16,24, 0,0,0,,100%,NORMAL, left,0,0,0,0,0
+Right = Avenir,16,24,0,0,0,,100%,NORMAL,right,0,0,,0,0
+Center = Avenir,16,24,0,0,0,,100%,NORMAL,center,,,0,0,0
 
 li = Avenir,16,20,0,0,0,,100%,NORMAL,left,10,10,0,0,0
 

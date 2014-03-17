@@ -1,13 +1,13 @@
 <p class="Normal" >
-	<span>A project by</span>
+	<span>A very groovy thing that will stand the test of time and be cool.
 </p>
 <p class="Left" >
-	<span>David Gross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span>
+	<span>David Gross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span>Ooga booga boo.
 </p>
 <p class="Right" >
-	<span>Righty McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span>
+	<span>Righty McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span><a href="cowdung">Ooga booga boo.</a>
 </p>
 
 <p class="Center" >
-	<span>Center McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span>
+	<span>Center McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span> are great people who love to eat super-duper-wooper all day.
 </p>

@@ -35,7 +35,7 @@
 
 
 -- TESTING
-local testing = false
+local testing = true
 
 
 -- Main var for this module
@@ -450,6 +450,27 @@ local function getFontAscent(baselineCache, font, size)
 end
 
 
+-- Finished lines, aligns them left/right/center
+local function finishedLine(result, renderedLine, settings, textAlignment)
+	funx.addPosRect(renderedLine, true)
+	renderedLine.anchorChildren = true
+
+	local ta = lower(textAlignment)
+	if ( ta == "right" ) then
+		renderedLine.x = settings.width
+		renderedLine.anchorX = 1
+
+	elseif (ta == "center" ) then
+		renderedLine.x = settings.width/2
+		renderedLine.anchorX = 0.5
+
+	else
+		renderedLine.x = 0
+		renderedLine.anchorX = 0
+
+	end
+end
+
 
 
 
@@ -836,16 +857,16 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				textAlignment = funx.fixCapsForReferencePoint(params[11])
 				-- set the line starting point to match the alignment
 				if (lower(textAlignment) == "right") then
-					x = settings.width - settings.rightIndent
+					--x = settings.width - settings.rightIndent
 					settings.currentFirstLineIndent = 0
 					settings.firstLineIndent = 0
 				elseif (lower(textAlignment) == "center") then
 					local currentWidth = settings.width - settings.leftIndent - settings.rightIndent -- settings.firstLineIndent
-					x = floor(currentWidth/2) --+ settings.firstLineIndent
+					--x = floor(currentWidth/2) --+ settings.firstLineIndent
 				else
 					x = 0
 				end
-print ("** 111111111")
+				-- Alignment happens after a whole line is built.
 				x = 0
 			end
 		end
@@ -958,18 +979,18 @@ print ("** 111111111")
 				textAlignment = funx.fixCapsForReferencePoint(format['text-align'])
 				-- set the line starting point to match the alignment
 				if (lower(textAlignment) == "right") then
-					x = settings.width - settings.rightIndent
+					--x = settings.width - settings.rightIndent
 					settings.currentFirstLineIndent = 0
 					settings.firstLineIndent = 0
 				elseif (lower(textAlignment) == "center") then
 					-- Center
 					local currentWidth = settings.width - settings.leftIndent - settings.rightIndent -- settings.firstLineIndent
-					x = floor(currentWidth/2) --+ settings.firstLineIndent
+					--x = floor(currentWidth/2) --+ settings.firstLineIndent
 				else
 					x = 0
 				end
-print ("*** 2222222222222")
-x = 0
+				-- Alignment happens after a whole line is built.
+				x = 0
 
 			end
 
@@ -1218,10 +1239,10 @@ if (not settings.width) then print ("WARNING: textwrap: line 844: Damn, the widt
 					textAlignment = "Left"
 				end
 				textDisplayReferencePoint = display["Bottom"..textAlignment.."ReferencePoint"]
-
-print ("1222: textAlignment",textAlignment)
-textAlignment = "Left"
-textDisplayReferencePoint = display["BottomLeftReferencePoint"]
+				
+				-- Everything is left aligned, the alignment happens after a whole line is built.
+				textAlignment = "Left"
+				textDisplayReferencePoint = display["BottomLeftReferencePoint"]
 
 
 				local shortword = ""
@@ -1408,7 +1429,7 @@ textDisplayReferencePoint = display["BottomLeftReferencePoint"]
 							-- Align the text on the row
 							local function positionNewDisplayLineX(newDisplayLineGroup, w, currentWidth)
 								local ta = lower(textAlignment)
-ta = left
+--ta = left
 								if (ta == "center") then
 									newDisplayLineGroup.x = x + settings.currentLeftIndent + xOffset + currentWidth/2
 								elseif (ta == "right") then
@@ -1422,7 +1443,7 @@ ta = left
 							-- Align the text on the row
 							local function setCurrentXOffset(newDisplayLineText)
 								local ta = lower(textAlignment)
-ta = left
+--ta = left
 								if (ta == "center") then
 									currentXOffset = newDisplayLineText.x
 								elseif (ta == "right") then
@@ -1799,7 +1820,7 @@ else
 													newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
 
 													-- Adjust Y to the baseline, not top-left corner of the font bounding-box
-													newDisplayLineGroup.y = baselineAdjustment
+													newDisplayLineGroup.y = lineY + baselineAdjustment
 
 													positionNewDisplayLineX(newDisplayLineGroup, newDisplayLineText.width, currentWidth)
 
@@ -1986,7 +2007,7 @@ end
 
 													result:insert(newDisplayLineGroup)
 													newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
-													newDisplayLineGroup.x, newDisplayLineGroup.y = x, baselineAdjustment
+													newDisplayLineGroup.x, newDisplayLineGroup.y = x, lineY + baselineAdjustment
 
 													positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
 
@@ -2055,7 +2076,7 @@ end
 								else
 									currentLine = tempLine
 								end
-							end
+							end -- for
 
 							---------------------------------------------
 							-- end for
@@ -2163,15 +2184,16 @@ end
 								result:insert(newDisplayLineGroup)
 								newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
 								newDisplayLineGroup.x = x
-								newDisplayLineGroup.y = baselineAdjustment
+								newDisplayLineGroup.y = lineY + baselineAdjustment
 
 								positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
 
 								-- For allowing centered/right text to be positioned on the line:
 								local ta = lower(textAlignment)
 								if (ta == "center" or ta=="right") then
-									local q = display.newRect(newDisplayLineGroup, 0,0,settings.width, 1)
-									q.isVisible = false
+									local q = display.newRect(newDisplayLineGroup, 0,0,settings.width, 5)
+									q:setFillColor(0,250,0)
+									q.isVisible = true
 								end
 
 
@@ -2232,7 +2254,7 @@ end
 							cacheIndex = cacheIndex + 1
 							return result
 							
-end
+						end
 
 						end -- renderParsedElement()
 
@@ -2317,12 +2339,17 @@ end
 						end
 
 					elseif (tag == "br") then
+						print ("WARNING: CANNOT HANDLE BR PROPERLY")
+						renderTextFromMargin = true
+						currentXOffset = 0
+						x = 0
+						settings.leftIndent = 0
+						settings.rightIndent = 0
  					end
 
 					if (tag == "a") then
 						setStyleFromTag (tag, attr)
 					end
-
 
 					-- LIST ITEMS: add a bullet or number
 					if (tag == "li") then
@@ -2365,7 +2392,7 @@ end
 							if (not element) then
 								print ("***** WARNING, EMPTY ELEMENT**** ")
 							end
-print ("B-Tag",tag, element, currentXOffset)
+--print ("B-Tag",tag, element, currentXOffset)
 							local saveStyleSettings = getAllStyleSettings()
 							local e = renderParsedElement(n, element, tag, attr)
 							renderedLine:insert(e)
@@ -2377,52 +2404,24 @@ print ("B-Tag",tag, element, currentXOffset)
 					end -- end for
 					
 
-print ("END OF LOOP")					
+--print ("END OF LOOP")					
 					
---renderedLine.anchorChildren = true
-result:insert(renderedLine)
+					--renderedLine.anchorChildren = true
+					result:insert(renderedLine)
 
 					-- Close tags
 					-- AFTER rendering (so add afterspacing!)
 					if (tag == "p" or tag == "div") then
+						finishedLine(result, renderedLine, settings, textAlignment)
+						renderedLine.y = 0
+
 						setStyleFromTag (tag, attr)
 						renderTextFromMargin = true
-print ("RENDER P", textAlignment)
---funx.addPosRect(result, true)
-
-funx.addPosRect(renderedLine, true)
-funx.frameGroup(renderedLine)					
-renderedLine.anchorChildren = true
---renderedLine.y = 0
-
-local ta = lower(textAlignment)
-
-if ( ta == "right" ) then
-	renderedLine.x = settings.width
-	renderedLine.anchorX = 1
-
-elseif (ta == "center" ) then
-	renderedLine.x = settings.width/2
-	renderedLine.anchorX = 0.5
-
-else
-	renderedLine.x = 0
-	renderedLine.anchorX = 0
-
-end
-
-renderedLine.y = lineY
-
---local lineWidth = renderedLine.width
-
 
 						lineY = lineY + currentSpaceAfter
 						-- Reset the first line of paragraph flag
 						isFirstLine = true
-						
 
-						--renderedLine.x
-						
 						elementCounter = 1
 					elseif (tag == "li") then
 						setStyleFromTag (tag, attr)
@@ -2450,13 +2449,16 @@ renderedLine.y = lineY
 						isFirstLine = true
 						elementCounter = 1
 					elseif (tag == "br") then
+						finishedLine(result, renderedLine, settings, textAlignment)
+						renderedLine.y = 0
+
 						renderTextFromMargin = true
 						currentXOffset = 0
 						setStyleFromTag (tag, attr)
 						lineY = lineY + currentSpaceAfter
 						-- Reset the first line of paragraph flag
 						isFirstLine = true
-						elementCounter = 1
+						--elementCounter = 1
 					elseif (tag == "#document") then
 						-- lines from non-HTML text will be tagged #document
 						-- and this will handle them.
