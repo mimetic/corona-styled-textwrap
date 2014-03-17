@@ -5,9 +5,9 @@
 	<span>David Gross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span>
 </p>
 <p class="Right" >
-	<span>David Gross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span>
+	<span>Righty McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span>
 </p>
 
 <p class="Center" >
-	<span>David Gross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span>
+	<span>Center McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span>
 </p>

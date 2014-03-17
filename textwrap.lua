@@ -845,6 +845,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				else
 					x = 0
 				end
+print ("** 111111111")
+				x = 0
 			end
 		end
 
@@ -966,6 +968,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				else
 					x = 0
 				end
+print ("*** 2222222222222")
+x = 0
 
 			end
 
@@ -1152,6 +1156,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 					else
 						x = 0
 					end
+print ("*** 333333333")
+x = 0
 				end
 
 
@@ -1212,6 +1218,11 @@ if (not settings.width) then print ("WARNING: textwrap: line 844: Damn, the widt
 					textAlignment = "Left"
 				end
 				textDisplayReferencePoint = display["Bottom"..textAlignment.."ReferencePoint"]
+
+print ("1222: textAlignment",textAlignment)
+textAlignment = "Left"
+textDisplayReferencePoint = display["BottomLeftReferencePoint"]
+
 
 				local shortword = ""
 				local restOLineLen = strlen(restOLine)
@@ -1397,7 +1408,7 @@ if (not settings.width) then print ("WARNING: textwrap: line 844: Damn, the widt
 							-- Align the text on the row
 							local function positionNewDisplayLineX(newDisplayLineGroup, w, currentWidth)
 								local ta = lower(textAlignment)
-
+ta = left
 								if (ta == "center") then
 									newDisplayLineGroup.x = x + settings.currentLeftIndent + xOffset + currentWidth/2
 								elseif (ta == "right") then
@@ -1411,7 +1422,7 @@ if (not settings.width) then print ("WARNING: textwrap: line 844: Damn, the widt
 							-- Align the text on the row
 							local function setCurrentXOffset(newDisplayLineText)
 								local ta = lower(textAlignment)
-
+ta = left
 								if (ta == "center") then
 									currentXOffset = newDisplayLineText.x
 								elseif (ta == "right") then
@@ -1486,8 +1497,8 @@ if (not settings.width) then print ("WARNING: textwrap: line 844: Damn, the widt
 							result.anchorX, result.anchorY = 0, 0
 
 							-- Set the reference point to match the text alignment
+textAlignment = "Left"
 							textDisplayReferencePoint = display["Bottom"..textAlignment.."ReferencePoint"]
-
 							-- Preserve initial padding before first word
 							local  _, _, padding = find(nextChunk, "^([%s%-]*)")
 							padding = padding or ""
@@ -1788,7 +1799,7 @@ else
 													newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
 
 													-- Adjust Y to the baseline, not top-left corner of the font bounding-box
-													newDisplayLineGroup.y = lineY + baselineAdjustment
+													newDisplayLineGroup.y = baselineAdjustment
 
 													positionNewDisplayLineX(newDisplayLineGroup, newDisplayLineText.width, currentWidth)
 
@@ -1975,7 +1986,7 @@ end
 
 													result:insert(newDisplayLineGroup)
 													newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
-													newDisplayLineGroup.x, newDisplayLineGroup.y = x, lineY + baselineAdjustment
+													newDisplayLineGroup.x, newDisplayLineGroup.y = x, baselineAdjustment
 
 													positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
 
@@ -2152,7 +2163,7 @@ end
 								result:insert(newDisplayLineGroup)
 								newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
 								newDisplayLineGroup.x = x
-								newDisplayLineGroup.y = lineY + baselineAdjustment
+								newDisplayLineGroup.y = baselineAdjustment
 
 								positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
 
@@ -2376,23 +2387,19 @@ result:insert(renderedLine)
 					if (tag == "p" or tag == "div") then
 						setStyleFromTag (tag, attr)
 						renderTextFromMargin = true
-						lineY = lineY + currentSpaceAfter
-						-- Reset the first line of paragraph flag
-						isFirstLine = true
-						
 print ("RENDER P", textAlignment)
 --funx.addPosRect(result, true)
 
 funx.addPosRect(renderedLine, true)
 funx.frameGroup(renderedLine)					
---renderedLine.anchorChildren = true
+renderedLine.anchorChildren = true
 --renderedLine.y = 0
 
 local ta = lower(textAlignment)
 
 if ( ta == "right" ) then
-	renderedLine.x = 0--settings.width
-	renderedLine.anchorX = 0
+	renderedLine.x = settings.width
+	renderedLine.anchorX = 1
 
 elseif (ta == "center" ) then
 	renderedLine.x = settings.width/2
@@ -2404,11 +2411,15 @@ else
 
 end
 
-renderedLine.y = 0
+renderedLine.y = lineY
 
 --local lineWidth = renderedLine.width
 
 
+						lineY = lineY + currentSpaceAfter
+						-- Reset the first line of paragraph flag
+						isFirstLine = true
+						
 
 						--renderedLine.x
 						
