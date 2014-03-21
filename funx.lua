@@ -1,8 +1,8 @@
 -- funx.lua
 --
--- Version 0.2
+-- Version 0.3
 --
--- Copyright (C) 2010 David I. Gross. All Rights Reserved.
+-- Copyright (C) 2014 David I. Gross. All Rights Reserved.
 --
 -- This software is is protected by the author's copyright, and may not be used, copied,
 -- modified, merged, published, distributed, sublicensed, and/or sold, without
@@ -24,7 +24,6 @@
 
 local FUNX = {}
 
-
 -- Requires json library
 local json = require ( "json" )
 local lfs = require ( "lfs" )
@@ -37,7 +36,6 @@ local timedMessageList = {}
 -- Make a local copy of the application settings global
 local screenW, screenH = display.contentWidth, display.contentHeight
 local viewableScreenW, viewableScreenH = display.viewableContentWidth, display.viewableContentHeight
-local screenOffsetW, screenOffsetH = display.contentWidth -	 display.viewableContentWidth, display.contentHeight - display.viewableContentHeight
 local midscreenX = screenW*(0.5)
 local midscreenY = screenH*(0.5)
 
@@ -73,96 +71,42 @@ local function toZero(o)
 	o.x, o.y  = 0,0
 end
 
------------
--- Shortcut to set anchors to top-left
-local function anchorTopLeft(o)
-	o.anchorX, o.anchorY = 0,0
+
+
+local function anchor(obj, pos)
+	if (not obj) then return; end
+	
+	if 	   pos == "TopLeft"      then obj.anchorX, obj.anchorY = 0, 0
+	elseif pos == "TopCenter"    then obj.anchorX, obj.anchorY = 0.5, 0
+	elseif pos == "TopRight"     then obj.anchorX, obj.anchorY = 1, 0
+	elseif pos == "CenterLeft"   then obj.anchorX, obj.anchorY = 0, 0.5
+	elseif pos == "Center"       then obj.anchorX, obj.anchorY = 0.5, 0.5
+	elseif pos == "CenterRight"  then obj.anchorX, obj.anchorY = 1, 0.5
+	elseif pos == "BottomLeft"   then obj.anchorX, obj.anchorY = 0, 1
+	elseif pos == "BottomCenter" then obj.anchorX, obj.anchorY = 0.5, 1
+	elseif pos == "BottomRight"  then obj.anchorX, obj.anchorY = 1, 1
+
+	elseif pos == "TopLeftReferencePoint"      then obj.anchorX, obj.anchorY = 0, 0
+	elseif pos == "TopCenterReferencePoint"    then obj.anchorX, obj.anchorY = 0.5, 0
+	elseif pos == "TopRightReferencePoint"     then obj.anchorX, obj.anchorY = 1, 0
+	elseif pos == "CenterLeftReferencePoint"   then obj.anchorX, obj.anchorY = 0, 0.5
+	elseif pos == "CenterReferencePoint"       then obj.anchorX, obj.anchorY = 0.5, 0.5
+	elseif pos == "CenterRightReferencePoint"  then obj.anchorX, obj.anchorY = 1, 0.5
+	elseif pos == "BottomLeftReferencePoint"   then obj.anchorX, obj.anchorY = 0, 1
+	elseif pos == "BottomCenterReferencePoint" then obj.anchorX, obj.anchorY = 0.5, 1
+	elseif pos == "BottomRightReferencePoint"  then obj.anchorX, obj.anchorY = 1, 1
+
+	else obj.anchorX, obj.anchorY = 0.5, 0.5
+	
+	end
 end
 
------------
--- Shortcut to set anchors to top-left
-local function anchorCenter(o)
-	o.anchorX, o.anchorY = 0.5, 0.5
+local function anchorZero(obj,pos)
+	if (not obj) then return; end
+	anchor(obj, pos)
+	obj.x, obj.y  = 0,0
 end
 
------------
--- Shortcut to set anchors to top-left
-local function anchorTopCenter(o)
-	o.anchorX, o.anchorY = 0.5, 0
-end
-
------------
--- Shortcut to set anchors to top-left and x,y to 0,0
-local function anchorTopLeftZero(o)
-	o.anchorX, o.anchorY = 0,0
-	o.x, o.y  = 0,0
-end
-
------------
--- Shortcut to set anchors to top-left and x,y to 0,0
-local function anchorTopRight(o)
-	o.anchorX, o.anchorY = 1,0
-end
-
------------
--- Shortcut to set anchors to top-left and x,y to 0,0
-local function anchorTopRightZero(o)
-	o.anchorX, o.anchorY = 1,0
-	o.x, o.y  = 0,0
-end
-
------------
--- Shortcut to set anchors to center and x,y to 0,0
-local function anchorCenterZero(o)
-	o.anchorX, o.anchorY = 0.5, 0.5
-	o.x, o.y  = 0,0
-end
-
------------
--- Shortcut to set anchors to center and x,y to 0,0
-local function anchorTopCenterZero(o)
-	o.anchorX, o.anchorY = 0.5, 0
-	o.x, o.y  = 0,0
-end
-
------------
--- Shortcut to set anchors to top-left and x,y to 0,0
-local function anchorBottomLeft(o)
-	o.anchorX, o.anchorY = 0,1
-end
-
------------
--- Shortcut to set anchors to top-left and x,y to 0,0
-local function anchorBottomLeftZero(o)
-	o.anchorX, o.anchorY = 0,1
-	o.x, o.y  = 0,0
-end
-
------------
--- Shortcut to set anchors to top-left and x,y to 0,0
-local function anchorBottomRight(o)
-	o.anchorX, o.anchorY = 1,1
-end
-
------------
--- Shortcut to set anchors to top-left and x,y to 0,0
-local function anchorBottomRightZero(o)
-	o.anchorX, o.anchorY = 1,1
-	o.x, o.y  = 0,0
-end
-
------------
--- Shortcut to set anchors to top-left and x,y to 0,0
-local function anchorBottomCenter(o)
-	o.anchorX, o.anchorY = 0.5,1
-end
-
------------
--- Shortcut to set anchors to top-left and x,y to 0,0
-local function anchorBottomCenterZero(o)
-	o.anchorX, o.anchorY = 0.5,1
-	o.x, o.y  = 0,0
-end
 
 -- Add an invisible positioning rectangle for a group
 local function addPosRect(g, vis, c)
@@ -170,14 +114,14 @@ local function addPosRect(g, vis, c)
 	r.isVisible = vis
 	c = c or {250,0,0,100}
 	r:setFillColor(unpack(c))
-	anchorTopLeftZero(r)
+	anchorZero(r, "TopLeft")
 	return g
 end
 
 
 
 local function centerInParent(g)
-	anchorCenter(g)
+	anchor(g, "Center")
 	g.x = g.parent.width/2
 	g.y = g.parent.height/2
 return g
@@ -1290,7 +1234,7 @@ local function loadImageFile(filename, wildcardPath, whichSystemDirectory, showT
 			end
 --print ("loadImageFile: Using Corona method:", filename)
 		end
-		anchorCenterZero(image)
+		anchorZero(image, "Center")
 
 		return image, scaleFraction
 	else
@@ -1303,7 +1247,7 @@ local function loadImageFile(filename, wildcardPath, whichSystemDirectory, showT
 	
 		local i = display.newGroup()
 		i.anchorChildren = true
-		anchorCenterZero(i)
+		anchorZero(i, "Center")
 
 		local image = display.newImage(i, "_ui/missing-image.png", system.ResourceDirectory, true)
 		
@@ -1319,10 +1263,10 @@ local function loadImageFile(filename, wildcardPath, whichSystemDirectory, showT
 		i:insert(t)
 		image.x = midscreenX
 		image.y = midscreenY
-		t:setReferencePoint(display.CenterReferencePoint)
+		anchor(t, "Center")
 		t.x = midscreenX
 		t.y = midscreenY+40
-		i:setReferencePoint(display.CenterReferencePoint)
+		anchor(i, "Center")
 		i.x = 0
 		i.y = 0
 		-- second returned value is scaleFraction and 1 does nothing but won't crash stuff
@@ -1665,7 +1609,7 @@ local function popup(filename, color, bkgdAlpha, transitionTime, cancelOnTouch)
 	if (bkgd) then
 		checkScale(bkgd)
 		pgroup:insert (bkgd)
-		bkgd:setReferencePoint(display.CenterReferencePoint)
+		anchor(bkgd, "Center")
 		bkgd.x = midscreenX
 		bkgd.y = midscreenY
 		bkgd.alpha = bkgdAlpha
@@ -1679,7 +1623,7 @@ local function popup(filename, color, bkgdAlpha, transitionTime, cancelOnTouch)
 	mainImage = display.newImage(filename, true)
 	checkScale(mainImage)
 	pgroup:insert (mainImage)
-	mainImage:setReferencePoint(display.CenterReferencePoint)
+	anchor(mainImage, "Center")
 	mainImage.x = midscreenX
 	mainImage.y = midscreenY
 
@@ -1689,7 +1633,7 @@ local function popup(filename, color, bkgdAlpha, transitionTime, cancelOnTouch)
 		onRelease = closeMe,
 	}
 	pgroup:insert(closeButton)
-	anchorCenterZero(closeButton)
+	anchorZero(closeButton, "Center")
 	closeButton.x = (bkgd.width/2) - closeButton.width/4
 	closeButton.y = -(bkgd.height/2) + closeButton.height/4
 	closeButton:toFront()
@@ -1726,7 +1670,7 @@ local function popupWebpage(targetURL, color, bkgdAlpha, transitionTime, netrequ
 
 	local mainImage
 	local pgroup = display.newGroup()
-	anchorCenter(pgroup)
+	anchor(pgroup, "Center")
 	pgroup.x, pgroup.y = midscreenX, midscreenY
 	
 	local closing = false
@@ -1765,14 +1709,14 @@ local function popupWebpage(targetURL, color, bkgdAlpha, transitionTime, netrequ
 	-- cover all rect, darken background
 	local bkgdrect = display.newRect(0,0,screenW,screenH)
 	pgroup:insert(bkgdrect)
-	anchorCenter(bkgdrect)
+	anchor(bkgdrect, "Center")
 	bkgdrect:setFillColor( 55, 55, 55, 190 )
 
 	-- background graphic for popup
 	local bkgd = display.newImage("_ui/popup-"..color..".png", true)
 	checkScale(bkgd)
 	pgroup:insert (bkgd)
-	anchorCenter(bkgdrect)
+	anchor(bkgdrect, "Center")
 	bkgd.alpha = bkgdAlpha
 
 	local closeButton = widget.newButton {
@@ -1782,8 +1726,8 @@ local function popupWebpage(targetURL, color, bkgdAlpha, transitionTime, netrequ
 	    onRelease = closeMe,
 	}
 	pgroup:insert(closeButton)
-	closeButton:setReferencePoint(display.TopRightReferencePoint)
-	anchorCenterZero(closeButton)
+	anchor(closeButton, "TopRight")
+	anchorZero(closeButton, "Center")
 	closeButton.x = (bkgd.width/2) - closeButton.width/4
 	closeButton.y = -(bkgd.height/2) + closeButton.height/4
 	closeButton:toFront()
@@ -1860,23 +1804,23 @@ local function buildShadow(w,h,sw,opacity)
 	local br = display.newImage(shadow, "_ui/shadow_tl.png")
 	
 	-- Rotations make these non-obvious!
-	anchorTopLeftZero(tl)
-	anchorTopLeftZero(tr)
-	anchorTopRightZero(bl)
-	anchorBottomRightZero(br)
+	anchorZero(tl, "TopLeft")
+	anchorZero(tr, "TopLeft")
+	anchorZero(bl, "TopRight")
+	anchorZero(br, "BottomRight")
 
 	local left = display.newImage(shadow, "_ui/shadow_l.png")
 	local right = display.newImage(shadow, "_ui/shadow_l.png")
 	local top = display.newImage(shadow, "_ui/shadow_l.png")
 	local bottom = display.newImage(shadow, "_ui/shadow_l.png")
 	
-	anchorTopLeft(left)
-	anchorTopLeft(right)
-	anchorTopLeft(top)
-	anchorTopLeft(bottom)
+	anchor(left, "TopLeft")
+	anchor(right, "TopLeft")
+	anchor(top, "TopLeft")
+	anchor(bottom, "TopLeft")
 
-	anchorTopLeft(left)
-	anchorBottomLeft(right)
+	anchor(left, "TopLeft")
+	anchor(right, "BottomLeft")
 	top.anchorX, top.anchorY = 0.5,1
 	bottom.anchorX, bottom.anchorY = 0.5,0
 
@@ -1892,7 +1836,7 @@ local function buildShadow(w,h,sw,opacity)
 	local srect = display.newImage(shadow, "_ui/shadow_rect.png")
 	srect.width = w -- (2*corner)
 	srect.height = h -- (2*corner)
-	anchorTopLeft(srect)
+	anchor(srect, "TopLeft")
 	srect.x = corner
 	srect.y = corner
 
@@ -1969,15 +1913,15 @@ local function buildShadow(w,h,sw,opacity)
 
 	-- position
 	--[[
-	tl:setReferencePoint(display.TopLeftReferencePoint)
-	tr:setReferencePoint(display.TopLeftReferencePoint)
-	bl:setReferencePoint(display.TopLeftReferencePoint)
-	br:setReferencePoint(display.TopLeftReferencePoint)
+	anchor(tl, "TopLeft")
+	anchor(tr, "TopLeft")
+	anchor(bl, "TopLeft")
+	anchor(br, "TopLeft")
 
-	left:setReferencePoint(display.TopLeftReferencePoint)
-	right:setReferencePoint(display.TopLeftReferencePoint)
-	top:setReferencePoint(display.TopLeftReferencePoint)
-	bottom:setReferencePoint(display.TopLeftReferencePoint)
+	anchor(left, "TopLeft")
+	anchor(right, "TopLeft")
+	anchor(top, "TopLeft")
+	anchor(bottom, "TopLeft")
 	]]
 
 	if (top) then
@@ -2351,7 +2295,7 @@ local function shrinkAway (obj, callback, transitionSpeed, destX, destY)
 
 	callback = callback or nil
 	local t = transitionSpeed or (fadePageTime or 500)
-	obj:setReferencePoint(display.CenterReferencePoint)
+	anchor(obj, "Center")
 	transition.to( obj,  { time=t, xScale=0.01, yScale=0.01, alpha=0, x=destX, y=destY, onComplete=cb } )
 end
 
@@ -3216,7 +3160,7 @@ local function showTestBox (g,x,y,len, font,size,lineHeight,fontMetrics)
 	local yAdjustment = lineHeight -- + (-baseline * size)
 	len = len or 100
 	local b = display.newRect(g, x, y, x+len, y+yAdjustment)
-	b:setReferencePoint(display.TopLeftReferencePoint)
+	anchor(b, "TopLeft")
 	b.x = x
 	b.y = y
 	b:setFillColor(0,0,250, 0.3)
@@ -3706,16 +3650,16 @@ local function buildPictureCorners (w,h, filenames, offsets)
 	local imageBL = display.newImage(g, filenames.BL)
 	local imageBR = display.newImage(g, filenames.BR)
 
-	imageTL:setReferencePoint(display.TopLeftReferencePoint)
+	anchor(imageTL, "TopLeft")
 	imageTL.x = 0 + offsets.TLx; imageTL.y = 0 + offsets.TLy;
 
-	imageTR:setReferencePoint(display.TopRightReferencePoint)
+	anchor(imageTR, "TopRight")
 	imageTR.x = w + offsets.TRx; imageTR.y = 0 + offsets.TRy;
 
-	imageBL:setReferencePoint(display.BottomLeftReferencePoint)
+	anchor(imageBL, "BottomLeft")
 	imageBL.x = 0 + offsets.BLx; imageBL.y = h + offsets.BLy;
 
-	imageBR:setReferencePoint(display.BottomRightReferencePoint)
+	anchor(imageBR, "BottomRight")
 	imageBR.x = w + offsets.BRx; imageBR.y = h + offsets.BRy;
 
 	return g
@@ -3765,7 +3709,7 @@ local function flashscreen(t,a)
 	t = t or 100
 	a = a or 0.5
 	local r = display.newRect(0,0,screenW,screenH)
-	anchorTopLeftZero(r)
+	anchorZero(r, "TopLeft")
 	r.alpha = 0
 
 		local function removeFlasher()
@@ -3901,8 +3845,8 @@ local function coverUpScreenEdges(color)
 	local barR = display.newRect(coverup, 0,0,barWidth,screenH)
 	barL:setFillColor(c[1],c[2], c[3])
 	barR:setFillColor(c[1],c[2], c[3])
-	barL:setReferencePoint(display.TopLeftReferencePoint)
-	barR:setReferencePoint(display.TopLeftReferencePoint)
+	anchor(barL, "TopLeft")
+	anchor(barR, "TopLeft")
 	barL.x = -barWidth
 	barL.y = 0
 	barR.x = screenW
@@ -4375,7 +4319,7 @@ local function makeMask(width, height, maskDirectory)
 
 		local opening = display.newRect(g, 0,0,width, height )
 		opening:setFillColor(255)
-		opening:setReferencePoint(display.TopLeftReferencePoint)
+		anchor(opening, "TopLeft")
 		opening.x = 2
 		opening.y = 2
 
@@ -4416,7 +4360,7 @@ local function makeMaskForRect(x,y,width, height, maskDirectory)
 		-- opening
 		local opening = display.newRect(g, 0,0,width, height )
 		opening:setFillColor(255)
-		opening:setReferencePoint(display.TopLeftReferencePoint)
+		anchor(opening, "TopLeft")
 		opening.x = x
 		opening.y = y
 
@@ -4675,20 +4619,27 @@ FUNX.activityIndicatorOn = activityIndicatorOn
 FUNX.AddCommas = AddCommas
 FUNX.addPosRect = addPosRect
 FUNX.adjustXYforShadow  = adjustXYforShadow 
+
 FUNX.anchorBottomLeftZero = anchorBottomLeftZero
 FUNX.anchorBottomLeft = anchorBottomLeft
 FUNX.anchorBottomRightZero = anchorBottomRightZero
 FUNX.anchorBottomRight = anchorBottomRight
 FUNX.anchorBottomCenterZero = anchorBottomCenterZero
 FUNX.anchorBottomCenter = anchorBottomCenter
+
 FUNX.anchorCenter = anchorCenter
 FUNX.anchorCenterZero = anchorCenterZero
+
 FUNX.anchorTopCenter = anchorTopCenter
 FUNX.anchorTopCenterZero = anchorTopCenterZero
 FUNX.anchorTopLeft = anchorTopLeft
 FUNX.anchorTopLeftZero = anchorTopLeftZero
 FUNX.anchorTopRight = anchorTopRight
 FUNX.anchorTopRightZero = anchorTopRightZero
+
+FUNX.anchor = anchor
+FUNX.anchorZero = anchorZero
+
 FUNX.applyMask = applyMask
 FUNX.applyPercent  = applyPercent 
 FUNX.applyPercentIfSet = applyPercentIfSet
