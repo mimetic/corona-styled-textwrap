@@ -48,6 +48,7 @@ local entities = require ("entities")
 
 -- functions
 local max = math.max
+local min = math.min
 local lower = string.lower
 local gmatch = string.gmatch
 local gsub = string.gsub
@@ -1168,17 +1169,16 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 					textAlignment = funx.fixCapsForReferencePoint(params[2])
 					-- set the line starting point to match the alignment
 					if (lower(textAlignment) == "right") then
-						x = settings.width - settings.rightIndent
+						--x = settings.width - settings.rightIndent
 						settings.currentFirstLineIndent = 0
 						settings.firstLineIndent = 0
 					elseif  (lower(textAlignment) == "center") then
 						local currentWidth = settings.width - settings.leftIndent - settings.rightIndent -- settings.currentFirstLineIndent
-						x = floor(currentWidth/2) --+ settings.currentFirstLineIndent
+						--x = floor(currentWidth/2) --+ settings.currentFirstLineIndent
 					else
-						x = 0
+						--x = 0
 					end
-print ("*** 333333333")
-x = 0
+					x = 0
 				end
 
 
@@ -1242,8 +1242,8 @@ x = 0
 				textDisplayReferencePoint = display["Bottom"..textAlignment.."ReferencePoint"]
 				
 				-- Everything is left aligned, the alignment happens after a whole line is built.
-				textAlignment = "Left"
-				textDisplayReferencePoint = "Bottom"..textAlignment
+				--textAlignment = "Left"
+				textDisplayReferencePoint = "BottomLeft"
 
 
 				local shortword = ""
@@ -1344,12 +1344,14 @@ x = 0
 				-- Array of rendered lines, so we can access them one by one for alignment
 				local renderedLines = {}
 				local renderedLinesAlignments = {}
+				local renderedLinesText = {}
 				-- Index in array of lines rendered.
 				local currentRenderedLineIndex = 1
 				
 				
-				local function addToCurrentRenderedLine(obj, textAlignment)
-					textAlignmentForRender = textAlignmentForRender or "Left"
+				local function addToCurrentRenderedLine(obj, textAlignment, text)
+					textAlignment = textAlignment or "Left"
+					--currentRenderedLineIndex = max (1, currentRenderedLineIndex)
 					if (not renderedLines[currentRenderedLineIndex]) then
 						renderedLines[currentRenderedLineIndex] = display.newGroup()
 						renderedLines[currentRenderedLineIndex].anchorChildren = true
@@ -1358,6 +1360,16 @@ x = 0
 					end
 					renderedLines[currentRenderedLineIndex]:insert(obj)
 					funx.anchorZero(obj, "BottomLeft")
+					
+					if (testing) then
+						local q = display.newText("#"..currentRenderedLineIndex, 0, 0, '', 30)
+						q:setFillColor(unpack{ 0,0,250})
+						obj:insert(q)
+						funx.anchorZero(q, "BottomLeft")
+					end
+					renderedLinesText[currentRenderedLineIndex] = renderedLinesText[currentRenderedLineIndex] or ""
+					renderedLinesText[currentRenderedLineIndex] = renderedLinesText[currentRenderedLineIndex] .. text
+					
 					
 					renderedLinesAlignments[currentRenderedLineIndex] = textAlignment
 				end
@@ -1442,13 +1454,11 @@ textDisplayReferencePoint = "BottomLeft"
 							-- Note, for right-to-left languages, you'd have to change the trimming.
 							local function trimByAlignment(t)
 								local ta = lower(textAlignment)
-
+ta = "left"
 								if (ta == "center") then
 									t = trim(t)
 								elseif (ta == "right") then
 									t = funx.rtrim(t)
-								else
-									--t = funx.rtrim(t)
 								end
 								return t
 							end
@@ -1549,9 +1559,9 @@ ta = "left"
 							-- First lines are always rendered left, and the entire chunk is aligned after that.
 							-- Following lines are aligned properly inside the chunk.
 if ( isFirstLine and renderTextFromMargin ) then
-	textAlignment = "Left"
+	--textAlignment = "Left"
 end
-							textDisplayReferencePoint = "Bottom"..textAlignment
+							textDisplayReferencePoint = "BottomLeft"
 							-- Preserve initial padding before first word
 							local  _, _, padding = find(nextChunk, "^([%s%-]*)")
 							padding = padding or ""
@@ -1622,7 +1632,7 @@ end
 									lineHeight = cachedItem.lineHeight
 									xOffset = cachedItem.xOffset
 		
-									textDisplayReferencePoint = "Bottom"..textAlignment
+									textDisplayReferencePoint = "BottomLeft"
 		
 
 															local newDisplayLineGroup = display.newGroup()
@@ -1645,7 +1655,7 @@ end
 															--newDisplayLineText.alpha = settings.opacity
 
 															result:insert(newDisplayLineGroup)
-															addToCurrentRenderedLine(newDisplayLineGroup, textAlignment)
+															addToCurrentRenderedLine(newDisplayLineGroup, textAlignment, text)
 															
 															funx.anchor(newDisplayLineGroup, textDisplayReferencePoint)
 															newDisplayLineGroup.x, newDisplayLineGroup.y = cachedItem.x, cachedItem.y
@@ -1830,7 +1840,7 @@ end
 													newDisplayLineText.x, newDisplayLineText.y = 0, 0
 													--newDisplayLineText.alpha = settings.opacity
 
-													addToCurrentRenderedLine(newDisplayLineGroup, textAlignment)
+													addToCurrentRenderedLine(newDisplayLineGroup, textAlignment, currentLine)
 													currentRenderedLineIndex = currentRenderedLineIndex + 1
 
 													funx.anchor(newDisplayLineGroup, textDisplayReferencePoint)
@@ -2021,7 +2031,7 @@ end
 													newDisplayLineText.x, newDisplayLineText.y = 0, 0
 													--newDisplayLineText.alpha = settings.opacity
 
-													addToCurrentRenderedLine(newDisplayLineGroup, textAlignment)
+													addToCurrentRenderedLine(newDisplayLineGroup, textAlignment, word)
 													currentRenderedLineIndex = currentRenderedLineIndex + 1
 
 													funx.anchor(newDisplayLineGroup, textDisplayReferencePoint)
@@ -2123,16 +2133,17 @@ end
 									print ("----------------------------")
 									print ("C: Final line: ["..currentLine.."]", "length=" .. strlen(currentLine))
 									print ("Font: [".. settings.font .. "]")
+									print ("currentRenderedLineIndex:", currentRenderedLineIndex)
 									print ("isFirstLine", isFirstLine)
 									print ("renderTextFromMargin: ", renderTextFromMargin)
 									print ("Width,", settings.width)
-									print ("C) currentWidth", currentWidth)
+									print ("currentWidth", currentWidth)
+									print ("textAlignment: ", textAlignment)
 
 								end
 
-
+								
 								if (isFirstLine) then
-									isFirstLine = false
 									currentLineHeight = lineHeight
 									currentSpaceBefore = settings.spaceBefore
 									settings.currentFirstLineIndent = settings.firstLineIndent
@@ -2140,6 +2151,7 @@ end
 									-- Jump to next line to start this text
 									if (renderTextFromMargin ) then
 										lineY = lineY + currentLineHeight + currentSpaceBefore
+										--currentRenderedLineIndex = currentRenderedLineIndex + 1
 									end
 									--renderTextFromMargin = true
 								else
@@ -2149,18 +2161,15 @@ end
 									-- Not first line in a block of text, there might be something before it on the line,
 									-- e.g. a Bold/Italic block, so do not jump to next row
 									--lineY = lineY + currentLineHeight
-								
 								end
 
 								if (renderTextFromMargin) then
 									xOffset = 0
 									settings.currentLeftIndent = settings.leftIndent
-									renderTextFromMargin = false
 								else
 									xOffset = currentXOffset
 									settings.currentFirstLineIndent = 0
 									settings.currentLeftIndent = 0
-									--isFirstLine = false
 								end
 
 								-- We have the current line from the code above if this is not cached text.
@@ -2198,12 +2207,15 @@ end
 								newDisplayLineText:setFillColor(unpack(settings.color))
 								--funx.anchor(newDisplayLineText, textDisplayReferencePoint)
 								funx.anchor(newDisplayLineText, "BottomLeft")
-print ("C: textDisplayReferencePoint",textAlignment)								
+
 								newDisplayLineText.x, newDisplayLineText.y = 0, 0
 								--newDisplayLineText.alpha = settings.opacity
 
-								addToCurrentRenderedLine(newDisplayLineGroup, textAlignment)
-								-- Don't increment currentRenderedLineIndex because we don't know this is the end of a line.
+								if (renderTextFromMargin and not isFirstLine) then
+									currentRenderedLineIndex = currentRenderedLineIndex + 1
+								end
+								addToCurrentRenderedLine(newDisplayLineGroup, textAlignment, currentLine)
+
 
 								funx.anchor(newDisplayLineGroup, textDisplayReferencePoint)
 								newDisplayLineGroup.x = x
@@ -2213,6 +2225,7 @@ print ("C: textDisplayReferencePoint",textAlignment)
 								positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
 
 								-- For allowing centered/right text to be positioned on the line:
+								--[[
 								local ta = lower(textAlignment)
 								if ( ta=="right") then
 									local q = display.newRect(newDisplayLineGroup, 0,0,newDisplayLineGroup.width, 5)
@@ -2221,6 +2234,7 @@ print ("C: textDisplayReferencePoint",textAlignment)
 									q.anchorX = 0
 									q.x = 0
 								end
+								--]]
 
 
 								-- We don't know if we have added a line...this text might be inside another line.
@@ -2271,6 +2285,9 @@ print ("C: textDisplayReferencePoint",textAlignment)
 
 								-- Clear the current line
 								currentLine = ""
+								
+								isFirstLine = false
+								renderTextFromMargin = false
 
 							end
 							
@@ -2438,7 +2455,6 @@ print ("C: textDisplayReferencePoint",textAlignment)
 					
 
 --print ("END OF LOOP")					
-print ("A) currentRenderedLineIndex",currentRenderedLineIndex)
 					-- Close tags
 					-- AFTER rendering (so add afterspacing!)
 					if (tag == "p" or tag == "div") then
@@ -2447,7 +2463,6 @@ print ("A) currentRenderedLineIndex",currentRenderedLineIndex)
 						currentRenderedLineIndex = currentRenderedLineIndex + 1
 						setStyleFromTag (tag, attr)
 						renderTextFromMargin = true
-
 						lineY = lineY + currentSpaceAfter
 						-- Reset the first line of paragraph flag
 						isFirstLine = true
@@ -2503,7 +2518,6 @@ print ("A) currentRenderedLineIndex",currentRenderedLineIndex)
 						lineY = lineY + currentSpaceAfter
 --						elementCounter = 1
 					end
-print ("B) currentRenderedLineIndex",currentRenderedLineIndex)
 
 					--print ("Restore style settings", settings.color[1], tag)
 					-- Restore style settings to what they were before
@@ -2534,16 +2548,17 @@ print ("B) currentRenderedLineIndex",currentRenderedLineIndex)
 				-- ALIGNMENTS
 				-- Align the lines left/right/center
 				------------------------------------------------------------
-				for i=1,currentRenderedLineIndex-1 do
+				
+				for i,_ in pairs(renderedLines) do
+--print ("Get ",i, renderedLinesAlignments[i], renderedLinesText[i])
 					renderedLines[i].anchorChildren = true
 
 					if (renderedLinesAlignments[i] == "Right") then
 						renderedLines[i].anchorX = 1
-						renderedLines[i].x = settings.width
+						renderedLines[i].x = currentWidth
 					elseif (renderedLinesAlignments[i] == "Center") then
 						renderedLines[i].anchorX = 0.5
-						renderedLines[i].x = settings.width/2
---funx.frameGroup(renderedLines[i])
+						renderedLines[i].x = currentWidth/2
 					end
 				end
 						

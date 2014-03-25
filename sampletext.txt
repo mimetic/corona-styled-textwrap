@@ -1,8 +1,5 @@
-<p class="Normal" >
-	<span>A very groovy thing that will stand the test of time and be cool.
-</p>
 <p class="Left" >
-	<span>David Gross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span>Ooga booga boo.
+	<span>David Gross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span> Ooga  of the most distinguishing features of this species is thebooga boo.
 </p>
 <p class="Right" >
 	<span>Righty McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span><a href="cowdung">Ooga booga boo.</a>
