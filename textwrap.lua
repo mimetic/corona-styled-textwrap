@@ -416,11 +416,11 @@ end
 ------------------------------------------------
 local function getFontAscent(baselineCache, font, size)
 	
-	local baseline, baselineAdjustment, ascent
+	local baseline, descent, ascent
 
 	if (baselineCache[font] and baselineCache[font][size]) then
-			baseline, baselineAdjustment, ascent = unpack(baselineCache[font][size])
---print ("GetFontAscent CACHE", font, size, ":",baseline, baselineAdjustment, ascent)
+			baseline, descent, ascent = unpack(baselineCache[font][size])
+--print ("GetFontAscent CACHE", font, size, ":",baseline, descent, ascent)
 	else
 
 		local fontInfo = fontMetrics.getMetrics(font)
@@ -435,19 +435,19 @@ local function getFontAscent(baselineCache, font, size)
 		-- Set the new baseline from the font metrics
 		baseline = boxHeight + (size * fontInfo.descent)
 		
-		--local yAdjustment = (settings.size * fontInfo.capheight) - baseline
 		ascent = fontInfo.ascent * size
 		
 		-- This should adjust the font above/below the baseline to reflect differences in fonts,
 		-- putting them all on the same line.
-		baselineAdjustment = -(size * fontInfo.descent)
+		-- This amount is above the bottom of the rendered font box
+		descent = (size * fontInfo.descent)
 
 		if (not baselineCache[font]) then
 			baselineCache[font] = {}
 		end
-		baselineCache[font][size] = { baseline, baselineAdjustment, ascent }
+		baselineCache[font][size] = { baseline, descent, ascent }
 	end
-	return baseline, baselineAdjustment, ascent
+	return baseline, descent, ascent
 end
 
 
@@ -1026,7 +1026,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 					-- Set the new baseline from the font metrics
 					baseline = boxHeight + (settings.size * fontInfo.descent)
 					--]]
-					baseline, baselineAdjustment, ascent = getFontAscent(baselineCache, settings.font, settings.size)
+					baseline, descent, ascent = getFontAscent(baselineCache, settings.font, settings.size)
 				end
 				prevFont = settings.font
 				prevSize = settings.size
@@ -1281,7 +1281,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				local fontInfo = fontMetrics.getMetrics(settings.font)
 				local currentLineHeight = lineHeight
 
-				baseline, baselineAdjustment, ascent = getFontAscent(baselineCache, settings.font, settings.size)
+				baseline, descent, ascent = getFontAscent(baselineCache, settings.font, settings.size)
 
 
 				-- change case
@@ -1349,24 +1349,37 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				local currentRenderedLineIndex = 1
 				
 				
-				local function addToCurrentRenderedLine(obj, textAlignment, text)
+				
+				
+				
+				local function addToCurrentRenderedLine(obj, x, lineY, textAlignment, text)
 					textAlignment = textAlignment or "Left"
 					--currentRenderedLineIndex = max (1, currentRenderedLineIndex)
+					
 					if (not renderedLines[currentRenderedLineIndex]) then
 						renderedLines[currentRenderedLineIndex] = display.newGroup()
 						renderedLines[currentRenderedLineIndex].anchorChildren = true
 						funx.addPosRect(renderedLines[currentRenderedLineIndex], testing)
 						result:insert(renderedLines[currentRenderedLineIndex])
+						funx.anchorZero(renderedLines[currentRenderedLineIndex], "BottomLeft")
 					end
-					renderedLines[currentRenderedLineIndex]:insert(obj)
-					funx.anchorZero(obj, "BottomLeft")
 					
+					renderedLines[currentRenderedLineIndex]:insert(obj)
+					obj.x = x					
+					-- Move text to put the baseline at y=0
+					obj.y = ascent	
+					
+					renderedLines[currentRenderedLineIndex].y = lineY
+
+												
 					if (testing) then
 						local q = display.newText("#"..currentRenderedLineIndex, 0, 0, '', 30)
 						q:setFillColor(unpack{ 0,0,250})
 						obj:insert(q)
 						funx.anchorZero(q, "BottomLeft")
 					end
+					
+					
 					renderedLinesText[currentRenderedLineIndex] = renderedLinesText[currentRenderedLineIndex] or ""
 					renderedLinesText[currentRenderedLineIndex] = renderedLinesText[currentRenderedLineIndex] .. text
 					
@@ -1415,16 +1428,20 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 							local xOffset = 0
 							local wordlen = 0
 							local baseline = 0
-							local baselineAdjustment = 0
+							local descent = 0
 							local ascent = 0
 							
-							-- ----------------------------------------------------------
+							-- =======================================================
+							-- FUNCTIONS
+							-- =======================================================
+							
+							-- =======================================================
 							-- <A> tag box. If we make the text itself touchable, it is easy to miss it...your touch
 							-- goes through the white spaces around letter strokes!
 							-- This also should let us position text in a space, e.g. centered?
 							local function createLinkingBox(newDisplayLineGroup, newDisplayLineText, textDisplayReferencePoint, alttext, testBkgdColor )
 
-textDisplayReferencePoint = "BottomLeft"
+								textDisplayReferencePoint = "BottomLeft"
 
 								testBkgdColor = testBkgdColor or {250,250,100,30}
 
@@ -1450,8 +1467,10 @@ textDisplayReferencePoint = "BottomLeft"
 							end
 
 
+							-- =======================================================
 							-- Trim the text for the line depending on alignment
 							-- Note, for right-to-left languages, you'd have to change the trimming.
+							--[[
 							local function trimByAlignment(t)
 								local ta = lower(textAlignment)
 ta = "left"
@@ -1462,38 +1481,35 @@ ta = "left"
 								end
 								return t
 							end
+							--]]
 
 
 
+							-- =======================================================
 							-- Align the text on the row
 							local function positionNewDisplayLineX(newDisplayLineGroup, w, currentWidth)
-								local ta = lower(textAlignment)
-ta = "left"
-								if (ta == "center") then
-									newDisplayLineGroup.x = x + settings.currentLeftIndent + xOffset + currentWidth/2
-								elseif (ta == "right") then
-									newDisplayLineGroup.x = currentWidth + x + settings.currentLeftIndent + settings.currentFirstLineIndent + xOffset
-								else
-									newDisplayLineGroup.x = x + settings.currentLeftIndent + settings.currentFirstLineIndent + xOffset
-								end
+								newDisplayLineGroup.x = x + settings.currentLeftIndent + settings.currentFirstLineIndent + xOffset
 							end
 
+							-- =======================================================
 							-- Align the text on the row
 							local function setCurrentXOffset(newDisplayLineText)
-								local ta = lower(textAlignment)
-ta = "left"
-								if (ta == "center") then
-									currentXOffset = newDisplayLineText.x
-								elseif (ta == "right") then
-									currentXOffset = currentXOffset + newDisplayLineText.width
-								else
-									currentXOffset = currentXOffset + settings.currentLeftIndent + settings.currentFirstLineIndent + newDisplayLineText.width
-								end
+								currentXOffset = currentXOffset + settings.currentLeftIndent + settings.currentFirstLineIndent + newDisplayLineText.width
 							end
+							
+							-- =======================================================
+							-- =======================================================
 
 
 
-							baseline, baselineAdjustment, ascent = getFontAscent(baselineCache, settings.font, settings.size)
+							baseline, descent, ascent = getFontAscent(baselineCache, settings.font, settings.size)
+
+							-- If we're at the very first line of a text block, these
+							-- start at the Ascent, following InDesign defaults.
+							if (isFirstTextInBlock) then
+								lineY = ascent
+							end
+						
 
 							-- flag to indicate the text line to be rendered is the last line of the previously
 							-- rendered text (true) or is the continuation of that text (false)
@@ -1521,7 +1537,7 @@ ta = "left"
 							------------------------------------------------
 							if (settings.font ~= prevFont or settings.size ~= prevSize) then
 
-								baseline, baselineAdjustment, ascent = getFontAscent(baselineCache, settings.font, settings.size)
+								baseline, descent, ascent = getFontAscent(baselineCache, settings.font, settings.size)
 
 								prevFont = settings.font
 								prevSize = settings.size
@@ -1537,7 +1553,7 @@ ta = "left"
 							------
 							-- Calc the adjustment so we position text at its baseline, not top-left corner
 							-- For rendering using Reference Point TopLeft
-							--baselineAdjustment = 0
+							--descent = 0
 
 							------------------------------------------------
 							-- RENDER TEXT OBJECT
@@ -1555,12 +1571,6 @@ ta = "left"
 							result = display.newGroup()
 							result.anchorX, result.anchorY = 0, 0
 
-							-- Set the reference point to match the text alignment
-							-- First lines are always rendered left, and the entire chunk is aligned after that.
-							-- Following lines are aligned properly inside the chunk.
-if ( isFirstLine and renderTextFromMargin ) then
-	--textAlignment = "Left"
-end
 							textDisplayReferencePoint = "BottomLeft"
 							-- Preserve initial padding before first word
 							local  _, _, padding = find(nextChunk, "^([%s%-]*)")
@@ -1602,7 +1612,7 @@ end
 										settings.currentFirstLineIndent = settings.firstLineIndent
 										-- If first line of a block of text, then we must start on a new line.
 										-- Jump to next line to start this text
-										if (renderTextFromMargin ) then
+										if (not isFirstTextInBlock and renderTextFromMargin ) then
 											lineY = lineY + currentLineHeight + currentSpaceBefore
 										end
 										--renderTextFromMargin = true
@@ -1634,49 +1644,42 @@ end
 		
 									textDisplayReferencePoint = "BottomLeft"
 		
+									local newDisplayLineGroup = display.newGroup()
+									--newDisplayLineGroup.anchorChildren = true
+		
+									text = setCase(settings.case, text)
+		
+									local newDisplayLineText = display.newText({
+										parent = newDisplayLineGroup,
+										text = text,
+										x = 0, y = 0,
+										font = cachedItem.font,
+										fontSize = cachedItem.fontSize,
+										align = cachedItem.align,
+									})
 
-															local newDisplayLineGroup = display.newGroup()
-															--newDisplayLineGroup.anchorChildren = true
-								
-															text = setCase(settings.case, text)
-								
-															local newDisplayLineText = display.newText({
-																parent = newDisplayLineGroup,
-																text = text,
-																x = 0, y = 0,
-																font = cachedItem.font,
-																fontSize = cachedItem.fontSize,
-																align = cachedItem.align,
-															})
+									newDisplayLineText:setFillColor(unpack(cachedItem.color))
+									funx.anchorZero(newDisplayLineText, textDisplayReferencePoint)
+									--newDisplayLineText.x, newDisplayLineText.y = 0, 0
+									--newDisplayLineText.alpha = settings.opacity
 
-															newDisplayLineText:setFillColor(unpack(cachedItem.color))
-															funx.anchor(newDisplayLineText, textDisplayReferencePoint)
-															newDisplayLineText.x, newDisplayLineText.y = 0,0
-															--newDisplayLineText.alpha = settings.opacity
+									result:insert(newDisplayLineGroup)
+									addToCurrentRenderedLine(newDisplayLineGroup, x, lineY, textAlignment, text)
+									currentRenderedLineIndex = currentRenderedLineIndex + 1
 
-															result:insert(newDisplayLineGroup)
-															addToCurrentRenderedLine(newDisplayLineGroup, textAlignment, text)
-															
-															funx.anchor(newDisplayLineGroup, textDisplayReferencePoint)
-															newDisplayLineGroup.x, newDisplayLineGroup.y = cachedItem.x, cachedItem.y
+									-- Use once, then set to zero.
+									settings.currentFirstLineIndent = 0
 
-															--positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
-
-															lineCount = lineCount + 1
-
-															-- Use once, then set to zero.
-															settings.currentFirstLineIndent = 0
-
-															-- <A> tag box. If we make the text itself touchable, it is easy to miss it...your touch
-															-- goes through the white spaces around letter strokes!
-															createLinkingBox(newDisplayLineGroup, newDisplayLineText, textDisplayReferencePoint, currentLine, {250,0,250,30} )
-								
-															lineCount = lineCount + 1
-								
-															if (not yAdjustment or yAdjustment == 0) then
-																--yAdjustment = (settings.size * fontInfo.ascent )- newDisplayLineGroup.height
-																yAdjustment = ( (settings.size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLineGroup.height
-															end
+									-- <A> tag box. If we make the text itself touchable, it is easy to miss it...your touch
+									-- goes through the white spaces around letter strokes!
+									createLinkingBox(newDisplayLineGroup, newDisplayLineText, textDisplayReferencePoint, currentLine, {250,0,250,30} )
+		
+									lineCount = lineCount + 1
+		
+									if (not yAdjustment or yAdjustment == 0) then
+										--yAdjustment = (settings.size * fontInfo.ascent )- newDisplayLineGroup.height
+										yAdjustment = ( (settings.size / fontInfo.sampledFontSize ) * fontInfo.textHeight)- newDisplayLineGroup.height
+									end
 
 
 								end -- for
@@ -1715,7 +1718,7 @@ end
 								tempLine = setCase(settings.case, tempLine)
 
 								-- Grab the first words of the line, until "minLineCharCount" hit
-								if (textwrapIsCached or (strlen(allTextInLine) > settings.minLineCharCount)) then
+								if (strlen(allTextInLine) > settings.minLineCharCount) then
 									-- Allow for lines with beginning spaces, for positioning
 									if (usePeriodsForLineBeginnings and substring(currentLine,1,1) == ".") then
 										currentLine = substring(currentLine,2,-1)
@@ -1727,7 +1730,7 @@ end
 									else
 										-- Draw the text as a line.								-- Trim based on alignment!
 										tempDisplayLineTxt = display.newText({
-											text=trimByAlignment(tempLine),
+											text=tempLine,
 											x=0,
 											y=0,
 											font = settings.font,
@@ -1788,7 +1791,8 @@ end
 														print ("currentWidth",currentWidth)
 														print ("isFirstLine", isFirstLine)
 														print ("renderTextFromMargin: ", renderTextFromMargin)
-														print ("   newDisplayLineGroup.y = ",lineY + baselineAdjustment .. "+" .. baselineAdjustment)
+														print ("lineY = ",lineY)
+														print ("   newDisplayLineGroup.y = ",lineY + descent .. " + " .. descent)
 													end
 
 													if (isFirstLine) then
@@ -1796,7 +1800,7 @@ end
 														currentSpaceBefore = settings.spaceBefore
 														isFirstLine = false
 														settings.currentFirstLineIndent = settings.firstLineIndent
-														if (renderTextFromMargin) then
+														if (not isFirstTextInBlock and renderTextFromMargin) then
 															lineY = lineY + currentLineHeight + currentSpaceBefore
 														end
 													else
@@ -1815,15 +1819,10 @@ end
 														settings.currentLeftIndent = 0
 													end
 													
-													if (not textwrapIsCached) then
-														-- Works for left-aligned...right is a mess anyway.
-														if (renderTextFromMargin or isFirstLine) then
-															currentLine = trim(currentLine)
-														end
-														currentLine = trimByAlignment(currentLine)
-														--cachedChunk.text[cachedChunkIndex] = currentLine
-														--cachedChunk.width[cachedChunkIndex] = tempLineWidth	
+													if (renderTextFromMargin or isFirstLine) then
+														currentLine = trim(currentLine)
 													end
+													currentLine = currentLine
 													
 													local newDisplayLineGroup = display.newGroup()
 
@@ -1836,17 +1835,12 @@ end
 														align = "left",
 													})
 													newDisplayLineText:setFillColor(unpack(settings.color))
-													funx.anchor(newDisplayLineText, "BottomLeft")
-													newDisplayLineText.x, newDisplayLineText.y = 0, 0
+													funx.anchorZero(newDisplayLineText, "BottomLeft")
+													--newDisplayLineText.x, newDisplayLineText.y = 0, 0--descent
 													--newDisplayLineText.alpha = settings.opacity
 
-													addToCurrentRenderedLine(newDisplayLineGroup, textAlignment, currentLine)
+													addToCurrentRenderedLine(newDisplayLineGroup, x, lineY, textAlignment, currentLine)
 													currentRenderedLineIndex = currentRenderedLineIndex + 1
-
-													funx.anchor(newDisplayLineGroup, textDisplayReferencePoint)
-
-													-- Adjust Y to the baseline, not top-left corner of the font bounding-box
-													newDisplayLineGroup.y = lineY + baselineAdjustment
 
 													positionNewDisplayLineX(newDisplayLineGroup, newDisplayLineText.width, currentWidth)
 
@@ -1969,7 +1963,7 @@ end
 -- ----------------------------------------------------
 -- ----------------------------------------------------
 
-													word = trimByAlignment(word)
+													word = word
 
 													if (textwrapIsCached) then
 														currentLine = word
@@ -1986,7 +1980,7 @@ if (testing) then
 	print ("B: render a word: "..word)
 	print ("\nrenderTextFromMargin reset to TRUE.")
 	print ("isFirstLine", isFirstLine)
-	print ("   newDisplayLineGroup.y",lineY + baselineAdjustment, baselineAdjustment)
+	print ("   newDisplayLineGroup.y",lineY + descent, descent)
 	print ("leftIndent + currentFirstLineIndent + xOffset", settings.leftIndent, settings.currentFirstLineIndent, xOffset)
 end
 
@@ -1995,7 +1989,7 @@ end
 														currentSpaceBefore = settings.spaceBefore
 														isFirstLine = false
 														settings.currentFirstLineIndent = settings.firstLineIndent
-														if (renderTextFromMargin) then
+														if (not isFirstTextInBlock and renderTextFromMargin) then
 															lineY = lineY + currentLineHeight + currentSpaceBefore
 														end
 													else
@@ -2027,16 +2021,13 @@ end
 													})
 
 													newDisplayLineText:setFillColor(unpack(settings.color))
-													funx.anchor(newDisplayLineText, textDisplayReferencePoint)
-													newDisplayLineText.x, newDisplayLineText.y = 0, 0
+													funx.anchorZero(newDisplayLineText, textDisplayReferencePoint)
+													--newDisplayLineText.x, newDisplayLineText.y = 0, 0
 													--newDisplayLineText.alpha = settings.opacity
 
-													addToCurrentRenderedLine(newDisplayLineGroup, textAlignment, word)
+													addToCurrentRenderedLine(newDisplayLineGroup, x, lineY, textAlignment, word)
 													currentRenderedLineIndex = currentRenderedLineIndex + 1
-
-													funx.anchor(newDisplayLineGroup, textDisplayReferencePoint)
-													newDisplayLineGroup.x, newDisplayLineGroup.y = x, lineY + baselineAdjustment
-
+													
 													positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
 
 													lineCount = lineCount + 1
@@ -2149,9 +2140,8 @@ end
 									settings.currentFirstLineIndent = settings.firstLineIndent
 									-- If first line of a block of text, then we must start on a new line.
 									-- Jump to next line to start this text
-									if (renderTextFromMargin ) then
+									if (not isFirstTextInBlock and renderTextFromMargin ) then
 										lineY = lineY + currentLineHeight + currentSpaceBefore
-										--currentRenderedLineIndex = currentRenderedLineIndex + 1
 									end
 									--renderTextFromMargin = true
 								else
@@ -2195,7 +2185,7 @@ end
 								local newDisplayLineGroup = display.newGroup()
 								--newDisplayLineGroup.anchorChildren = true
 								
-								currentLine = trimByAlignment(currentLine)
+								currentLine = currentLine
 								local newDisplayLineText = display.newText({
 									parent = newDisplayLineGroup,
 									text = currentLine,
@@ -2206,36 +2196,17 @@ end
 								})
 								newDisplayLineText:setFillColor(unpack(settings.color))
 								--funx.anchor(newDisplayLineText, textDisplayReferencePoint)
-								funx.anchor(newDisplayLineText, "BottomLeft")
+								funx.anchorZero(newDisplayLineText, "BottomLeft")
 
-								newDisplayLineText.x, newDisplayLineText.y = 0, 0
+								--newDisplayLineText.x, newDisplayLineText.y = 0, 0
 								--newDisplayLineText.alpha = settings.opacity
 
 								if (renderTextFromMargin and not isFirstLine) then
 									currentRenderedLineIndex = currentRenderedLineIndex + 1
 								end
-								addToCurrentRenderedLine(newDisplayLineGroup, textAlignment, currentLine)
+								addToCurrentRenderedLine(newDisplayLineGroup, x, lineY, textAlignment, currentLine)
 
-
-								funx.anchor(newDisplayLineGroup, textDisplayReferencePoint)
-								newDisplayLineGroup.x = x
-								newDisplayLineGroup.y = lineY + baselineAdjustment
-								
-								
 								positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
-
-								-- For allowing centered/right text to be positioned on the line:
-								--[[
-								local ta = lower(textAlignment)
-								if ( ta=="right") then
-									local q = display.newRect(newDisplayLineGroup, 0,0,newDisplayLineGroup.width, 5)
-									q:setFillColor(0,0,250)
-									q.isVisible = testing
-									q.anchorX = 0
-									q.x = 0
-								end
-								--]]
-
 
 								-- We don't know if we have added a line...this text might be inside another line.
 								-- So we don't increment line count
@@ -2297,6 +2268,8 @@ end
 							cacheIndex = cacheIndex + 1							
 						end
 	
+						isFirstTextInBlock = false
+						
 						return result
 
 
@@ -2387,12 +2360,9 @@ end
 						end
 
 					elseif (tag == "br") then
-						print ("WARNING: CANNOT HANDLE BR PROPERLY")
 						renderTextFromMargin = true
 						currentXOffset = 0
 						x = 0
-						settings.leftIndent = 0
-						settings.rightIndent = 0
  					end
 
 					if (tag == "a") then
@@ -2459,14 +2429,12 @@ end
 					-- AFTER rendering (so add afterspacing!)
 					if (tag == "p" or tag == "div") then
 						--finishedLine(result, renderedLine, settings, textAlignment)
-						renderedLine.y = 0
 						currentRenderedLineIndex = currentRenderedLineIndex + 1
 						setStyleFromTag (tag, attr)
 						renderTextFromMargin = true
 						lineY = lineY + currentSpaceAfter
 						-- Reset the first line of paragraph flag
 						isFirstLine = true
-
 						elementCounter = 1
 					elseif (tag == "li") then
 						setStyleFromTag (tag, attr)
@@ -2497,14 +2465,12 @@ end
 						isFirstLine = true
 						elementCounter = 1
 					elseif (tag == "br") then
-						finishedLine(result, renderedLine, settings, textAlignment)
+						--finishedLine(result, renderedLine, settings, textAlignment)
 						currentRenderedLineIndex = currentRenderedLineIndex + 1
-						renderedLine.y = 0
-
 						renderTextFromMargin = true
 						currentXOffset = 0
 						setStyleFromTag (tag, attr)
-						lineY = lineY + currentSpaceAfter
+						lineY = lineY + currentLineHeight
 						-- Reset the first line of paragraph flag
 						isFirstLine = true
 						--elementCounter = 1
@@ -2551,7 +2517,7 @@ end
 				
 				for i,_ in pairs(renderedLines) do
 --print ("Get ",i, renderedLinesAlignments[i], renderedLinesText[i])
-					renderedLines[i].anchorChildren = true
+					--renderedLines[i].anchorChildren = true
 
 					if (renderedLinesAlignments[i] == "Right") then
 						renderedLines[i].anchorX = 1
@@ -2562,8 +2528,6 @@ end
 					end
 				end
 						
-
-				isFirstTextInBlock = false
 
 				return result
 
@@ -2583,12 +2547,15 @@ end
 	-- Finished rendering all blocks of text (all paragraphs).
 	-- Anchor the text block TOP-LEFT by default
 	-----------------------------
-	result.anchorChildren = true
+	--result.anchorChildren = true
 	result.anchorX, result.anchorY = 0,0
 
-	--print ("textwrap.lua: yAdjustment is turned OFF because it wasn't working! No idea why.")
-	result.yAdjustment = yAdjustment
-	--print ("textDisplayReferencePoint",textDisplayReferencePoint)
+	--result.yAdjustment = yAdjustment
+
+	if (testing) then
+		print ("textwrap.lua: yAdjustment is turned OFF because it wasn't working! No idea why.")
+	end
+	result.yAdjustment = 0
 
 	saveTextWrapToCache(textUID, cache, baselineCache, cacheDir)
 

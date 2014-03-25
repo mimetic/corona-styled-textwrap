@@ -3,8 +3,8 @@ application =
 {
 	content =
 	{
-        width = 480,
-        height = 640,
+        width = 768,
+        height = 1024,
         scale = "letterbox",
 		antialias = false,
 		xalign = "center",

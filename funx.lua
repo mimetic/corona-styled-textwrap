@@ -1469,8 +1469,19 @@ local function frameGroup(g, s, color)
 
 	local w,h = g.contentWidth or screenW, g.contentHeight or screenH
 
-	local r = display.newRect(g, 0, 0, w, h)
-	r.strokeWidth = s or 5
+	local a = g.anchorChildren
+	g.anchorChildren = true
+
+	local bounds = g.contentBounds 
+--	print( "xMin: ".. bounds.xMin ) -- xMin: 100
+--	print( "yMin: ".. bounds.yMin ) -- yMin: 100
+--	print( "xMax: ".. bounds.xMax ) -- xMax: 150
+--	print( "yMax: ".. bounds.yMax ) -- yMax: 150
+
+	g.anchorChildren = a
+
+	local r = display.newRect(g, bounds.xMin, bounds.yMin, w, h)
+	r.strokeWidth = s or 1
 
 	color = color or "255,0,0"
 
@@ -1483,7 +1494,7 @@ local function frameGroup(g, s, color)
 	
 	r:toBack()
 	r.anchorX, r.anchorY = 0, 0
-	r.x, r.y = 0,0
+	r.x, r.y = bounds.xMin, bounds.yMin
 end
 
 
