@@ -173,8 +173,6 @@ bkgd:toBack()
 				fontSize = 20,
 				x =screenW - 100,
 				y=50,
-				defaultFile = "",
-				overFile = "",
 				onRelease = toggleWireframe,
 			}
 	wfb:toFront()

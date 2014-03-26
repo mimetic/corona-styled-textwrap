@@ -1006,33 +1006,12 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			------------------------------------------------
 			if (settings.font ~= prevFont or settings.size ~= prevSize) then
 
-				if ( baselineCache[settings.font] and baselineCache[settings.font][settings.size] ) then
-					baseline = baselineCache[settings.font][settings.size]
-				else
-					-- ALIGN TOP OF TEXT FRAME TO CAP HEIGHT!!!
-					-- If this is the first line in the block of text, DON'T apply the space before settings
-					-- Tell the function which called this to raise the entire block to the cap-height
-					-- of the first line.
-					--[[
-					fontInfo = fontMetrics.getMetrics(settings.font)
-
-					-- Get the iOS bounding box size for this particular font!!!
-					-- This must be done for each size and font, since it changes unpredictably
-					local samplefont = display.newText("X", 0, 0, settings.font, settings.size)
-					local boxHeight = samplefont.height
-					samplefont:removeSelf()
-					samplefont = nil
-
-					-- Set the new baseline from the font metrics
-					baseline = boxHeight + (settings.size * fontInfo.descent)
-					--]]
-					baseline, descent, ascent = getFontAscent(baselineCache, settings.font, settings.size)
-				end
+				baseline, descent, ascent = getFontAscent(baselineCache, settings.font, settings.size)
 				prevFont = settings.font
 				prevSize = settings.size
 			end
 			
-			
+			baseline, descent, ascent = getFontAscent(baselineCache, settings.font, settings.size)
 			
 		end
 
@@ -1344,7 +1323,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				-- Array of rendered lines, so we can access them one by one for alignment
 				local renderedLines = {}
 				local renderedLinesAlignments = {}
-				local renderedLinesText = {}
+				local renderedLinesStats = {}
 				-- Index in array of lines rendered.
 				local currentRenderedLineIndex = 1
 				
@@ -1362,13 +1341,16 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 						funx.addPosRect(renderedLines[currentRenderedLineIndex], testing)
 						result:insert(renderedLines[currentRenderedLineIndex])
 						funx.anchorZero(renderedLines[currentRenderedLineIndex], "BottomLeft")
+						renderedLinesStats[currentRenderedLineIndex] = renderedLinesStats[currentRenderedLineIndex] or { text = "", ascent = ascent, }
 					end
+					
+					renderedLinesStats[currentRenderedLineIndex].ascent = max( renderedLinesStats[currentRenderedLineIndex].ascent, ascent)
 					
 					renderedLines[currentRenderedLineIndex]:insert(obj)
 					obj.x = x					
 					-- Move text to put the baseline at y=0
-					obj.y = ascent	
-					
+					obj.y = renderedLinesStats[currentRenderedLineIndex].ascent --ascent
+
 					renderedLines[currentRenderedLineIndex].y = lineY
 
 												
@@ -1380,8 +1362,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 					end
 					
 					
-					renderedLinesText[currentRenderedLineIndex] = renderedLinesText[currentRenderedLineIndex] or ""
-					renderedLinesText[currentRenderedLineIndex] = renderedLinesText[currentRenderedLineIndex] .. text
+					renderedLinesStats[currentRenderedLineIndex].text = renderedLinesStats[currentRenderedLineIndex].text .. text
 					
 					
 					renderedLinesAlignments[currentRenderedLineIndex] = textAlignment
@@ -1404,8 +1385,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 
 					-- Init stacks
 					stacks = stacks or { list = { ptr = 1 } }
-
-					local isFirstBlockLine
 
 
 					------------------------------------------------------------
@@ -1502,15 +1481,6 @@ ta = "left"
 
 
 
-							baseline, descent, ascent = getFontAscent(baselineCache, settings.font, settings.size)
-
-							-- If we're at the very first line of a text block, these
-							-- start at the Ascent, following InDesign defaults.
-							if (isFirstTextInBlock) then
-								lineY = ascent
-							end
-						
-
 							-- flag to indicate the text line to be rendered is the last line of the previously
 							-- rendered text (true) or is the continuation of that text (false)
 							-- Starts true for first item, then is false unless changed later.
@@ -1524,6 +1494,15 @@ ta = "left"
 							-- Apply the tag, e.g. bold or italic
 							if (tag) then
 								setStyleFromTag (tag, attr)
+							end
+
+
+							baseline, descent, ascent = getFontAscent(baselineCache, settings.font, settings.size)
+
+							-- If we're at the very first line of a text block, these
+							-- start at the Ascent, following InDesign defaults.
+							if (isFirstTextInBlock) then
+								lineY = ascent
 							end
 
 
@@ -2198,9 +2177,6 @@ end
 								--funx.anchor(newDisplayLineText, textDisplayReferencePoint)
 								funx.anchorZero(newDisplayLineText, "BottomLeft")
 
-								--newDisplayLineText.x, newDisplayLineText.y = 0, 0
-								--newDisplayLineText.alpha = settings.opacity
-
 								if (renderTextFromMargin and not isFirstLine) then
 									currentRenderedLineIndex = currentRenderedLineIndex + 1
 								end
@@ -2297,9 +2273,6 @@ end
 						x = 0
 						settings.leftIndent = 0
 						settings.rightIndent = 0
-
-						-- First line of a paragraph (block) of text.
-						isFirstBlockLine = true
 						
 						-- Apply style based on tag, e.g. <ol> or <p>
 						if (textstyles and textstyles[tag] ) then
@@ -2516,7 +2489,7 @@ end
 				------------------------------------------------------------
 				
 				for i,_ in pairs(renderedLines) do
---print ("Get ",i, renderedLinesAlignments[i], renderedLinesText[i])
+--print ("Get ",i, renderedLinesAlignments[i], renderedLinesStats[i].text)
 					--renderedLines[i].anchorChildren = true
 
 					if (renderedLinesAlignments[i] == "Right") then
