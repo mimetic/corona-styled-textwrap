@@ -175,6 +175,20 @@ end
 
 
 --------------------------------------------------------
+-- Trim based on alignment
+--------------------------------------------------------
+local function trimToAlignment(t,a)
+	if (a == "Right") then
+		t = funx.rtrim(t)
+	elseif (a == "Center") then
+		t = funx.trim(t)
+	else
+		t = funx.ltrim(t)
+	end
+	return t
+end
+
+--------------------------------------------------------
 -- Get tag formatting values
 --------------------------------------------------------
 local function getTagFormatting(fontFaces, tag, currentfont, variation, attr)
@@ -356,6 +370,17 @@ end
 
 
 --------------------------------------------------------
+-- CACHE: Clear all caches
+
+local function clearAllCaches(cacheDir)
+	if (cacheDir and cacheDir ~= "") then
+		funx.rmDir (cacheDir .. "/" .. textWrapCacheDir, system.CachesDirectory, true) -- keep structure, delete contents
+	end
+end
+
+
+
+--------------------------------------------------------
 -- Make a box that is the right size for touching.
 -- Problem is, the font sizes are so big, they overlap lines.
 -- This box will be a nicer size.
@@ -451,25 +476,24 @@ local function getFontAscent(baselineCache, font, size)
 end
 
 
+-- ------------------------------------------------------
 -- Finished lines, aligns them left/right/center
-local function finishedLine(renderedLine, settings, textAlignment)
-	funx.addPosRect(renderedLine, testing)
-	renderedLine.anchorChildren = true
-
-	local ta = lower(textAlignment)
-	if ( ta == "right" ) then
-		renderedLine.x = settings.width
-		renderedLine.anchorX = 1
-
-	elseif (ta == "center" ) then
-		renderedLine.x = settings.width/2
-		renderedLine.anchorX = 0.5
-
-	else
-		renderedLine.x = 0
-		renderedLine.anchorX = 0
-
+-- ------------------------------------------------------
+local function alignRenderedLines(lines, stats)
+	for i,_ in pairs(lines) do
+		if (stats[i].textAlignment == "Right") then
+			lines[i].anchorX = 1
+			lines[i].x = stats[i].currentWidth + stats[i].leftIndent + stats[i].firstLineIndent
+		elseif (stats[i].textAlignment == "Center") then
+			lines[i].anchorX = 0.5
+			-- currentWidth compensates for margins			
+			local c = stats[i].leftIndent + stats[i].firstLineIndent + (stats[i].currentWidth)/2
+			lines[i].x = c
+		else
+			lines[i].x = stats[i].leftIndent + stats[i].firstLineIndent
+		end
 	end
+	return lines
 end
 
 
@@ -499,6 +523,12 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local screenOffsetW, screenOffsetH = display.contentWidth -  display.viewableContentWidth, display.contentHeight - display.viewableContentHeight
 	local midscreenX = screenW*(0.5)
 	local midscreenY = screenH*(0.5)
+
+
+	local baseline = 0
+	local descent = 0
+	local ascent = 0
+
 
 	if (testing) then
 		print ("autoWrappedText: testing flag is true.")
@@ -547,7 +577,9 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 		cacheDir = text.cacheDir
 		settings.handler = text.handler
 		hyperlinkFillColor = text.hyperlinkFillColor or "0,0,255,"..TRANSPARENT
-
+		
+		testing = testing or text.testing
+		
 		-- restore text
 		text = text.text
 	end
@@ -561,7 +593,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local cacheIndex = 1
 	
 	-- Cache of font baselines for different sizes, as drawing on screen
-	baselineCache = {}
+	local baselineCache = {}
 	
 	-- Interpret the width so we can get it right caching:
 	width = funx.percentOfScreenWidth(width) or display.contentWidth
@@ -748,7 +780,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			-- space after paragraph
 			params.spaceAfter = settings.spaceAfter or 0
 			-- First Line Indent
-			params.firstLineIndent =firstLineIndent
+			params.firstLineIndent = settings.firstLineIndent
 			-- Left Indent
 			params.leftIndent = settings.leftIndent
 			-- Right Indent
@@ -778,7 +810,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				-- space after paragraph
 			if (params.spaceAfter ) then settings.spaceAfter = tonumber(params.spaceAfter) end
 				-- First Line Indent
-			if (params.firstLineIndent ) then params.firstLineIndent = tonumber(firstLineIndent) end
+			if (params.firstLineIndent ) then params.firstLineIndent = tonumber(settings.firstLineIndent) end
 				-- Left Indent
 			if (params.leftIndent ) then settings.leftIndent = tonumber(params.leftIndent) end
 				-- Right Indent
@@ -862,7 +894,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 					settings.currentFirstLineIndent = 0
 					settings.firstLineIndent = 0
 				elseif (lower(textAlignment) == "center") then
-					local currentWidth = settings.width - settings.leftIndent - settings.rightIndent -- settings.firstLineIndent
+					--local currentWidth = settings.width - settings.leftIndent - settings.rightIndent -- settings.firstLineIndent
 					--x = floor(currentWidth/2) --+ settings.firstLineIndent
 				else
 					x = 0
@@ -985,7 +1017,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 					settings.firstLineIndent = 0
 				elseif (lower(textAlignment) == "center") then
 					-- Center
-					local currentWidth = settings.width - settings.leftIndent - settings.rightIndent -- settings.firstLineIndent
+					--local currentWidth = settings.width - settings.leftIndent - settings.rightIndent -- settings.firstLineIndent
 					--x = floor(currentWidth/2) --+ settings.firstLineIndent
 				else
 					x = 0
@@ -1094,7 +1126,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	-- which is right since it is escaped HTML.
 	for line in gmatch(text, oneLinePattern) do
 		local command, commandline
-		local currentSpaceAfter, currentSpaceBefore
 
 		local lineEnd = substring(line,-1,-1)
 		local q = funx.escape(lineEnd)
@@ -1152,7 +1183,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 						settings.currentFirstLineIndent = 0
 						settings.firstLineIndent = 0
 					elseif  (lower(textAlignment) == "center") then
-						local currentWidth = settings.width - settings.leftIndent - settings.rightIndent -- settings.currentFirstLineIndent
+						--local currentWidth = settings.width - settings.leftIndent - settings.rightIndent -- settings.currentFirstLineIndent
 						--x = floor(currentWidth/2) --+ settings.currentFirstLineIndent
 					else
 						--x = 0
@@ -1230,26 +1261,26 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 
 				-- Set paragraph wide stuff, indents and spacing
 				settings.currentFirstLineIndent = settings.firstLineIndent
-				currentSpaceBefore = settings.spaceBefore
-				currentSpaceAfter = settings.spaceAfter
+				settings.currentSpaceBefore = settings.spaceBefore
+				settings.currentSpaceAfter = settings.spaceAfter
 
 				if (lineBreakType == "hard") then
 					settings.currentFirstLineIndent = settings.firstLineIndent
-					currentSpaceBefore = settings.spaceBefore
-					currentSpaceAfter = settings.spaceAfter
+					settings.currentSpaceBefore = settings.spaceBefore
+					settings.currentSpaceAfter = settings.spaceAfter
 					isFirstLine = true
 				end
 
 				if (lineBreakType == "soft") then
-					currentSpaceBefore = settings.spaceBefore
-					currentSpaceAfter = 0
+					settings.currentSpaceBefore = settings.spaceBefore
+					settings.currentSpaceAfter = 0
 				end
 
 				-- If previous paragraph had a soft return, don't add space before, nor indent the 1st line
 				if (prevLineBreakType == "soft") then
 					settings.currentFirstLineIndent = 0
-					currentSpaceAfter = 0
-					currentSpaceBefore = 0
+					settings.currentSpaceAfter = 0
+					settings.currentSpaceBefore = 0
 				end
 
 				-- ALIGN TOP OF TEXT FRAME TO CAP HEIGHT!!!
@@ -1269,26 +1300,21 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				end
 
 				-- Width of the text column (not including indents which are paragraph based)
-				local currentWidth = settings.width
-				--local currentWidth = width - settings.leftIndent - settings.rightIndent - settings.currentFirstLineIndent
+				settings.currentWidth = settings.width
+				--settings.currentWidth = width - settings.leftIndent - settings.rightIndent - settings.currentFirstLineIndent
 
 				-- Get min characters to start with
 				-- We now know the max char width in a font,
 				-- so we can start with a minimum based on that.
 				-- IF the metric was set!
 				if (fontInfo.maxHorizontalAdvance) then
-					settings.minLineCharCount = floor((currentWidth * widthCorrection) / (settings.size * fontInfo.maxCharWidth) )
+					settings.minLineCharCount = floor((settings.currentWidth * widthCorrection) / (settings.size * fontInfo.maxCharWidth) )
 				end
 
 
 
 				-- Remember the font we start with to handle bold/italic changes
 				local basefont = settings.font
-
-				-- Offset from left or right of the current chunk of text
-				-- As we add chunks to previous chunks of text (building a line)
-				-- we need to know where the next chunk goes.
-				local currentXOffset = 0
 
 				local prevTextInLine = ""
 
@@ -1322,19 +1348,15 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				
 				-- Array of rendered lines, so we can access them one by one for alignment
 				local renderedLines = {}
-				local renderedLinesAlignments = {}
 				local renderedLinesStats = {}
 				-- Index in array of lines rendered.
 				local currentRenderedLineIndex = 1
 				
 				
 				
-				
-				
-				local function addToCurrentRenderedLine(obj, x, lineY, textAlignment, text)
+				local function addToCurrentRenderedLine(obj, x, lineY, textAlignment, settings, text)
 					textAlignment = textAlignment or "Left"
-					--currentRenderedLineIndex = max (1, currentRenderedLineIndex)
-					
+						
 					if (not renderedLines[currentRenderedLineIndex]) then
 						renderedLines[currentRenderedLineIndex] = display.newGroup()
 						renderedLines[currentRenderedLineIndex].anchorChildren = true
@@ -1347,25 +1369,41 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 					renderedLinesStats[currentRenderedLineIndex].ascent = max( renderedLinesStats[currentRenderedLineIndex].ascent, ascent)
 					
 					renderedLines[currentRenderedLineIndex]:insert(obj)
-					obj.x = x					
-					-- Move text to put the baseline at y=0
-					obj.y = renderedLinesStats[currentRenderedLineIndex].ascent --ascent
+					
+					obj.x = x + settings.currentXOffset
+
+					-- Set the line at it's baseline, by using the Font's Ascent value
+					obj.y = renderedLinesStats[currentRenderedLineIndex].ascent
 
 					renderedLines[currentRenderedLineIndex].y = lineY
-
-												
-					if (testing) then
-						local q = display.newText("#"..currentRenderedLineIndex, 0, 0, '', 30)
-						q:setFillColor(unpack{ 0,0,250})
-						obj:insert(q)
-						funx.anchorZero(q, "BottomLeft")
-					end
-					
 					
 					renderedLinesStats[currentRenderedLineIndex].text = renderedLinesStats[currentRenderedLineIndex].text .. text
+
+					-- Can't just save the settings table b/c Lua doesn't 'copy' tables 
+					-- by assigning to a new variable!
+					renderedLinesStats[currentRenderedLineIndex].rightIndent = settings.rightIndent
+					renderedLinesStats[currentRenderedLineIndex].leftIndent = settings.leftIndent
+					renderedLinesStats[currentRenderedLineIndex].firstLineIndent = settings.currentFirstLineIndent
+					
+
+					renderedLinesStats[currentRenderedLineIndex].textAlignment = textAlignment
+					renderedLinesStats[currentRenderedLineIndex].currentWidth = settings.currentWidth
+					renderedLinesStats[currentRenderedLineIndex].width = settings.width
+					
+					if (false and testing) then
+						local q = display.newText{
+										parent = obj,
+										text = "#"..currentRenderedLineIndex, 
+										x = obj.width/2, y = -obj.height/2,
+										fontSize = 10,
+										align = "left",
+									}
+						q:setFillColor(250,0,0)
+						funx.anchor(q, "center")
+					end
+									
 					
 					
-					renderedLinesAlignments[currentRenderedLineIndex] = textAlignment
 				end
 				
 				
@@ -1376,10 +1414,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 					-- The rendered text with multiple lines in it
 					local result = display.newGroup()
 					
-					-- One line of text, can be moved left/right/center
-					local renderedLine = display.newGroup()
-					funx.addPosRect(renderedLine, testing)
-
 					parseDepth = parseDepth or 0
 					parseDepth = parseDepth + 1
 
@@ -1400,15 +1434,14 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 							local nextChunk, nextChunkLen
 							local cachedChunk
 							local cachedChunkIndex = 1
-							local currentWidth
 							local tempDisplayLineTxt
 							local result, resultPosRect
 							local tempLine, allTextInLine
-							local xOffset = 0
 							local wordlen = 0
-							local baseline = 0
-							local descent = 0
-							local ascent = 0
+							
+							local isFirstLineInElement = true
+							
+							local cows = {}
 							
 							-- =======================================================
 							-- FUNCTIONS
@@ -1446,35 +1479,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 							end
 
 
-							-- =======================================================
-							-- Trim the text for the line depending on alignment
-							-- Note, for right-to-left languages, you'd have to change the trimming.
-							--[[
-							local function trimByAlignment(t)
-								local ta = lower(textAlignment)
-ta = "left"
-								if (ta == "center") then
-									t = trim(t)
-								elseif (ta == "right") then
-									t = funx.rtrim(t)
-								end
-								return t
-							end
-							--]]
-
-
-
-							-- =======================================================
-							-- Align the text on the row
-							local function positionNewDisplayLineX(newDisplayLineGroup, w, currentWidth)
-								newDisplayLineGroup.x = x + settings.currentLeftIndent + settings.currentFirstLineIndent + xOffset
-							end
-
-							-- =======================================================
-							-- Align the text on the row
-							local function setCurrentXOffset(newDisplayLineText)
-								currentXOffset = currentXOffset + settings.currentLeftIndent + settings.currentFirstLineIndent + newDisplayLineText.width
-							end
 							
 							-- =======================================================
 							-- =======================================================
@@ -1507,8 +1511,8 @@ ta = "left"
 
 
 							-- Set the current width of the column, factoring in indents
-							-- IS THIS RIGHT?!?!?!?
-							currentWidth = settings.width - settings.leftIndent - settings.rightIndent - settings.currentFirstLineIndent
+							-- Need the width to figure out how many words fit.
+							settings.currentWidth = settings.width - settings.leftIndent - settings.rightIndent - settings.currentFirstLineIndent
 
 
 							------------------------------------------------
@@ -1577,49 +1581,41 @@ ta = "left"
 
 							if (textwrapIsCached) then
 								if (testing) then
-									print ("Rendering from cache.")
+									print ("********** Rendering from cache.")
 								end
 	
 								for cachedChunkIndex, text in pairs(cachedChunk.text) do
 		
 									local cachedItem = getCachedChunkItem(cachedChunk, cachedChunkIndex)
+									local isFirstLine = cachedItem.isFirstLine
+									local renderTextFromMargin = cachedItem.renderTextFromMargin
 
-									if (cachedItem.isFirstLine) then
+									if (isFirstLine) then
 										isFirstLine = false
-										currentLineHeight = lineHeight
-										currentSpaceBefore = settings.spaceBefore
+--										currentLineHeight = lineHeight
+--										settings.currentSpaceBefore = settings.spaceBefore
 										settings.currentFirstLineIndent = settings.firstLineIndent
-										-- If first line of a block of text, then we must start on a new line.
-										-- Jump to next line to start this text
-										if (not isFirstTextInBlock and renderTextFromMargin ) then
-											lineY = lineY + currentLineHeight + currentSpaceBefore
-										end
-										--renderTextFromMargin = true
 									else
 										currentLineHeight = lineHeight
 										settings.currentFirstLineIndent = 0
-										currentSpaceBefore = 0
-										-- Not first line in a block of text, there might be something before it on the line,
-										-- e.g. a Bold/Italic block, so do not jump to next row
-										--lineY = lineY + currentLineHeight
+										settings.currentSpaceBefore = 0
 									end
 
-									if (cachedItem.renderTextFromMargin) then
-										xOffset = 0
+									if (renderTextFromMargin) then
 										settings.currentLeftIndent = settings.leftIndent
 										renderTextFromMargin = false
 									else
-										xOffset = currentXOffset
 										settings.currentFirstLineIndent = 0
 										settings.currentLeftIndent = 0
-										--isFirstLine = false
 									end
 		
 		
 									-- Cached values
-									currentSpaceBefore = cachedItem.currentSpaceBefore
 									lineHeight = cachedItem.lineHeight
-									xOffset = cachedItem.xOffset
+									currentRenderedLineIndex = cachedItem.currentRenderedLineIndex
+									lineY = cachedItem.lineY
+									x = cachedItem.x
+									textAlignment = cachedItem.textAlignment
 		
 									textDisplayReferencePoint = "BottomLeft"
 		
@@ -1634,7 +1630,7 @@ ta = "left"
 										x = 0, y = 0,
 										font = cachedItem.font,
 										fontSize = cachedItem.fontSize,
-										align = cachedItem.align,
+										align = "left",
 									})
 
 									newDisplayLineText:setFillColor(unpack(cachedItem.color))
@@ -1643,8 +1639,7 @@ ta = "left"
 									--newDisplayLineText.alpha = settings.opacity
 
 									result:insert(newDisplayLineGroup)
-									addToCurrentRenderedLine(newDisplayLineGroup, x, lineY, textAlignment, text)
-									currentRenderedLineIndex = currentRenderedLineIndex + 1
+									addToCurrentRenderedLine(newDisplayLineGroup, x, lineY, textAlignment, settings, text)
 
 									-- Use once, then set to zero.
 									settings.currentFirstLineIndent = 0
@@ -1652,7 +1647,8 @@ ta = "left"
 									-- <A> tag box. If we make the text itself touchable, it is easy to miss it...your touch
 									-- goes through the white spaces around letter strokes!
 									createLinkingBox(newDisplayLineGroup, newDisplayLineText, textDisplayReferencePoint, currentLine, {250,0,250,30} )
-		
+									
+									-- Legacy for non-HTML formatted lines of text
 									lineCount = lineCount + 1
 		
 									if (not yAdjustment or yAdjustment == 0) then
@@ -1671,9 +1667,9 @@ ta = "left"
 -- ============================================================
 
 
-	if (testing) then
-		print ("Rendering from XML, not cache.")
-	end
+							if (testing) then
+								print ("Rendering from XML, not cache.")
+							end
 
 							---------------------------------------------
 							--local word,spacer
@@ -1707,9 +1703,24 @@ ta = "left"
 									if ((strlen(allTextInLine) < nextChunkLen) and strlen(word) < settings.minWordLen) then
 										shortword = shortword..word..spacer
 									else
+
+										-- ===================================
+										-- TEST LINE: Render a test line of text
+										-- ===================================
+										local firstLineIndent, leftIndent, rightIndent
+
+										if (isFirstLine) then
+											firstLineIndent = settings.firstLineIndent
+										end
+										
+										local tempLineTrimmed = tempLine
+										if (renderTextFromMargin) then
+											tempLineTrimmed = trimToAlignment(tempLine, textAlignment)
+										end
+
 										-- Draw the text as a line.								-- Trim based on alignment!
 										tempDisplayLineTxt = display.newText({
-											text=tempLine,
+											text = tempLineTrimmed,
 											x=0,
 											y=0,
 											font = settings.font,
@@ -1733,7 +1744,7 @@ ta = "left"
 												settings.currentFirstLineIndent = 0
 											end
 										else
-											tempLineWidth = tempDisplayLineTxt.width + currentXOffset
+											tempLineWidth = tempDisplayLineTxt.width + settings.currentXOffset
 											settings.currentFirstLineIndent = 0
 										end
 
@@ -1741,14 +1752,19 @@ ta = "left"
 										tempDisplayLineTxt=nil;
 
 
+
+										-- ===================================
+
+
 										-- Since indents may change per line, we have to reset this each time.
-										currentWidth = settings.width - settings.leftIndent - settings.rightIndent - settings.currentFirstLineIndent
-										
-										if (tempLineWidth <= currentWidth * widthCorrection)  then
+										settings.currentWidth = settings.width - settings.leftIndent - settings.rightIndent - settings.currentFirstLineIndent
+
+										if (tempLineWidth <= settings.currentWidth * widthCorrection)  then
 											-- Do not render line, unless it is the last word,
 											-- in which case render ("C" render)
 											currentLine = tempLine
 										else
+										
 											if ( settings.maxHeight==0 or (lineY <= settings.maxHeight - currentLineHeight)) then
 
 												-- It is possible the first word is so long that it doesn't fit
@@ -1762,46 +1778,49 @@ ta = "left"
 
 
 
-													if (testing) then
-														print ()
-														print ("----------------------------")
-														print ("A: Render line: ["..currentLine .. "]")
-														print ("Font: [".. settings.font .. "]")
-														print ("currentWidth",currentWidth)
-														print ("isFirstLine", isFirstLine)
-														print ("renderTextFromMargin: ", renderTextFromMargin)
-														print ("lineY = ",lineY)
-														print ("   newDisplayLineGroup.y = ",lineY + descent .. " + " .. descent)
-													end
+	if (testing) then
+		print ()
+		print ("----------------------------")
+		print ("A: Render line: ["..currentLine .. "]")
+		print ("currentRenderedLineIndex:", currentRenderedLineIndex)
+	--														print ("Font: [".. settings.font .. "]")
+	--														print ("settings.currentWidth",settings.currentWidth)
+--		print ("isFirstLine", isFirstLine)
+--		print ("renderTextFromMargin: ", renderTextFromMargin)
+--		print ("lineY = ",lineY)
+	--														print ("   newDisplayLineGroup.y = ",lineY + descent .. " + " .. descent)
+	end
 
 													if (isFirstLine) then
 														currentLineHeight = lineHeight
-														currentSpaceBefore = settings.spaceBefore
+														settings.currentSpaceBefore = settings.spaceBefore
 														isFirstLine = false
 														settings.currentFirstLineIndent = settings.firstLineIndent
 														if (not isFirstTextInBlock and renderTextFromMargin) then
-															lineY = lineY + currentLineHeight + currentSpaceBefore
+															lineY = lineY + currentLineHeight + settings.currentSpaceBefore
 														end
 													else
 														currentLineHeight = lineHeight
-														currentSpaceBefore = 0
+														settings.currentSpaceBefore = 0
 														settings.currentFirstLineIndent = 0
 													end
 
 
 													if (renderTextFromMargin) then
+														if (textAlignment == "Left") then
+															currentLine = funx.ltrim(currentLine)
+														end
 														settings.currentLeftIndent = settings.leftIndent
-														xOffset = 0
+														settings.currentXOffset = 0
 													else
-														xOffset = currentXOffset
+														settings.currentXOffset = settings.currentXOffset
 														settings.currentFirstLineIndent = 0
 														settings.currentLeftIndent = 0
 													end
 													
-													if (renderTextFromMargin or isFirstLine) then
-														currentLine = trim(currentLine)
-													end
-													currentLine = currentLine
+													-- This line always goes to the right margin, so you
+													-- can always trim it on the right.
+													currentLine = funx.rtrim(currentLine)
 													
 													local newDisplayLineGroup = display.newGroup()
 
@@ -1815,14 +1834,15 @@ ta = "left"
 													})
 													newDisplayLineText:setFillColor(unpack(settings.color))
 													funx.anchorZero(newDisplayLineText, "BottomLeft")
-													--newDisplayLineText.x, newDisplayLineText.y = 0, 0--descent
-													--newDisplayLineText.alpha = settings.opacity
+													
+													-- 
+													if (renderTextFromMargin and isFirstLineInElement) then
+														isFirstLineInElement = false
+														currentRenderedLineIndex = currentRenderedLineIndex + 1
+													end
 
-													addToCurrentRenderedLine(newDisplayLineGroup, x, lineY, textAlignment, currentLine)
-													currentRenderedLineIndex = currentRenderedLineIndex + 1
-
-													positionNewDisplayLineX(newDisplayLineGroup, newDisplayLineText.width, currentWidth)
-
+													addToCurrentRenderedLine(newDisplayLineGroup, x, lineY, textAlignment, settings, currentLine)
+													
 													-- CACHE this line
 													if (not textwrapIsCached) then
 														updateCachedChunk (cachedChunk, { 
@@ -1833,14 +1853,17 @@ ta = "left"
 																	y = newDisplayLineGroup.y,
 																	font=settings.font,
 																	fontSize = settings.size,
-																	align = textAlignmentForRender,
+																	textAlignment = textAlignment,
 																	color = settings.color,
 																	lineHeight = lineHeight,
 																	lineY = lineY,
-																	currentSpaceBefore = currentSpaceBefore,
-																	xOffset = xOffset,
+																	currentSpaceBefore = settings.currentSpaceBefore,
+																	xOffset = settings.currentXOffset,
+																	currentRenderedLineIndex = currentRenderedLineIndex,
 																})
 													end
+
+													currentRenderedLineIndex = currentRenderedLineIndex + 1
 
 													-- Update cache chunk index counter
 													cachedChunkIndex = cachedChunkIndex + 1
@@ -1892,7 +1915,7 @@ ta = "left"
 
 													-- This line has now wrapped around, and the next one should start at the margin.
 													renderTextFromMargin = true
-													currentXOffset = 0
+													settings.currentXOffset = 0
 
 													-- And, we should now move our line cursor to the next row.
 													-- We know nothing can continue on this line because we've filled it up.
@@ -1913,7 +1936,7 @@ ta = "left"
 
 													--longword = true
 													renderTextFromMargin = true
-													currentXOffset = 0
+													settings.currentXOffset = 0
 													lineY = lineY + currentLineHeight
 												end
 
@@ -1925,7 +1948,7 @@ ta = "left"
 
 
 
-												if (textwrapIsCached or (not longword and wordlen <= currentWidth * widthCorrection) ) then
+												if (textwrapIsCached or (not longword and wordlen <= settings.currentWidth * widthCorrection) ) then
 													if (textwrapIsCached) then
 														currentLine = word
 													else
@@ -1960,32 +1983,38 @@ if (testing) then
 	print ("\nrenderTextFromMargin reset to TRUE.")
 	print ("isFirstLine", isFirstLine)
 	print ("   newDisplayLineGroup.y",lineY + descent, descent)
-	print ("leftIndent + currentFirstLineIndent + xOffset", settings.leftIndent, settings.currentFirstLineIndent, xOffset)
+	print ("leftIndent + currentFirstLineIndent + xOffset", settings.leftIndent, settings.currentFirstLineIndent, settings.currentXOffset)
 end
 
 													if (isFirstLine) then
 														currentLineHeight = lineHeight
-														currentSpaceBefore = settings.spaceBefore
+														settings.currentSpaceBefore = settings.spaceBefore
 														isFirstLine = false
 														settings.currentFirstLineIndent = settings.firstLineIndent
 														if (not isFirstTextInBlock and renderTextFromMargin) then
-															lineY = lineY + currentLineHeight + currentSpaceBefore
+															lineY = lineY + currentLineHeight + settings.currentSpaceBefore
 														end
 													else
 														currentLineHeight = lineHeight
-														currentSpaceBefore = 0
+														settings.currentSpaceBefore = 0
 														settings.currentFirstLineIndent = 0
 													end
 
 
 													if (renderTextFromMargin) then
+														if (textAlignment == "Left") then
+															currentLine = funx.ltrim(currentLine)
+														end
+														currentLine = trimToAlignment(currentLine, textAlignment)
 														settings.currentLeftIndent = settings.leftIndent
-														xOffset = 0
+														settings.currentXOffset = 0
 													else
-														xOffset = currentXOffset
+														settings.currentXOffset = settings.currentXOffset
 														settings.currentFirstLineIndent = 0
 														settings.currentLeftIndent = 0
 													end
+
+													currentLine = funx.rtrim(currentLine)
 
 													local newDisplayLineGroup = display.newGroup()
 													--newDisplayLineGroup.anchorChildren = true
@@ -2004,11 +2033,14 @@ end
 													--newDisplayLineText.x, newDisplayLineText.y = 0, 0
 													--newDisplayLineText.alpha = settings.opacity
 
-													addToCurrentRenderedLine(newDisplayLineGroup, x, lineY, textAlignment, word)
+													if (renderTextFromMargin and isFirstLineInElement) then
+														isFirstLineInElement = false
+														currentRenderedLineIndex = currentRenderedLineIndex + 1
+													end
+
+													addToCurrentRenderedLine(newDisplayLineGroup, x, lineY, textAlignment, settings, word)
 													currentRenderedLineIndex = currentRenderedLineIndex + 1
 													
-													positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
-
 													lineCount = lineCount + 1
 													currentLine = ''
 
@@ -2030,12 +2062,13 @@ end
 																	y = newDisplayLineGroup.y,
 																	font=settings.font,
 																	fontSize = settings.size,
-																	align = textAlignmentForRender,
+																	textAlignment = textAlignment,
 																	color = settings.color,
 																	lineHeight = lineHeight,
 																	lineY = lineY,
-																	currentSpaceBefore = currentSpaceBefore,
-																	xOffset = xOffset,
+																	currentSpaceBefore = settings.currentSpaceBefore,
+																	xOffset = settings.currentXOffset,
+																	currentRenderedLineIndex = currentRenderedLineIndex,
 																})
 													end
 													
@@ -2048,7 +2081,7 @@ end
 													lineY = lineY + currentLineHeight
 
 													renderTextFromMargin = true
-													currentXOffset = 0
+													settings.currentXOffset = 0
 
 												end	-- end B
 
@@ -2102,67 +2135,57 @@ end
 									print ()
 									print ("----------------------------")
 									print ("C: Final line: ["..currentLine.."]", "length=" .. strlen(currentLine))
-									print ("Font: [".. settings.font .. "]")
-									print ("currentRenderedLineIndex:", currentRenderedLineIndex)
-									print ("isFirstLine", isFirstLine)
-									print ("renderTextFromMargin: ", renderTextFromMargin)
-									print ("Width,", settings.width)
-									print ("currentWidth", currentWidth)
-									print ("textAlignment: ", textAlignment)
+--									print ("Font: [".. settings.font .. "]")
+--									print ("currentRenderedLineIndex:", currentRenderedLineIndex)
+--									print ("isFirstLine", isFirstLine)
+--									print ("renderTextFromMargin: ", renderTextFromMargin)
+--									print ("Width,", settings.width)
+--									print ("settings.currentWidth", settings.currentWidth)
+--									print ("textAlignment: ", textAlignment)
 
 								end
 
 								
 								if (isFirstLine) then
 									currentLineHeight = lineHeight
-									currentSpaceBefore = settings.spaceBefore
+									settings.currentSpaceBefore = settings.spaceBefore
 									settings.currentFirstLineIndent = settings.firstLineIndent
 									-- If first line of a block of text, then we must start on a new line.
 									-- Jump to next line to start this text
 									if (not isFirstTextInBlock and renderTextFromMargin ) then
-										lineY = lineY + currentLineHeight + currentSpaceBefore
+										lineY = lineY + currentLineHeight + settings.currentSpaceBefore
 									end
 									--renderTextFromMargin = true
 								else
 									currentLineHeight = lineHeight
 									settings.currentFirstLineIndent = 0
-									currentSpaceBefore = 0
+									settings.currentSpaceBefore = 0
 									-- Not first line in a block of text, there might be something before it on the line,
 									-- e.g. a Bold/Italic block, so do not jump to next row
 									--lineY = lineY + currentLineHeight
 								end
 
 								if (renderTextFromMargin) then
-									xOffset = 0
+									currentLine = funx.ltrim(currentLine)
+									settings.currentXOffset = 0
 									settings.currentLeftIndent = settings.leftIndent
 								else
-									xOffset = currentXOffset
+									settings.currentXOffset = settings.currentXOffset
 									settings.currentFirstLineIndent = 0
 									settings.currentLeftIndent = 0
 								end
 
-								-- We have the current line from the code above if this is not cached text.
---								if (not textwrapIsCached) then
---									cachedChunk.text[cachedChunkIndex] = currentLine
---									cachedChunk.width[cachedChunkIndex] = currentWidth
---								end
---								cachedChunkIndex = cachedChunkIndex + 1
-
 
 								if (testing) then
-									print ("Previous Line:", "["..prevTextInLine.."]", strlen(prevTextInLine))
-									print ("lineY:",lineY)
-									print ("currentSpaceBefore:",currentSpaceBefore, settings.spaceBefore)
-									print ("currentSpaceAfter:",currentSpaceAfter, settings.spaceAfter)
-									if (currentSpaceBefore > 0) then
-										print ("************")
-									end
+--									print ("Previous Line:", "["..prevTextInLine.."]", strlen(prevTextInLine))
+--									print ("lineY:",lineY)
+--									print ("settings.currentSpaceBefore:",settings.currentSpaceBefore, settings.spaceBefore)
+--									print ("settings.currentSpaceAfter:",settings.currentSpaceAfter, settings.spaceAfter)
 								end
 
 								--print ("C: render a line:", currentLine)
 
 								local newDisplayLineGroup = display.newGroup()
-								--newDisplayLineGroup.anchorChildren = true
 								
 								currentLine = currentLine
 								local newDisplayLineText = display.newText({
@@ -2171,27 +2194,18 @@ end
 									x = 0, y = 0,
 									font = settings.font,
 									fontSize = settings.size,
-									align = textAlignmentForRender,
+									align = "left",
 								})
 								newDisplayLineText:setFillColor(unpack(settings.color))
-								--funx.anchor(newDisplayLineText, textDisplayReferencePoint)
 								funx.anchorZero(newDisplayLineText, "BottomLeft")
 
 								if (renderTextFromMargin and not isFirstLine) then
 									currentRenderedLineIndex = currentRenderedLineIndex + 1
 								end
-								addToCurrentRenderedLine(newDisplayLineGroup, x, lineY, textAlignment, currentLine)
 
-								positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
+								addToCurrentRenderedLine(newDisplayLineGroup, x, lineY, textAlignment, settings, currentLine)
 
-								-- We don't know if we have added a line...this text might be inside another line.
-								-- So we don't increment line count
-								-- lineCount = lineCount + 1
-
-								-- We know this is a short line, and it is possible the next chunk of text
-								-- will begin on the same line, so we capture the x value. So, set the
-								-- currentXOffset value so the next text starts in the right column.
-								setCurrentXOffset(newDisplayLineText, xOffset)
+								settings.currentXOffset = settings.currentXOffset + newDisplayLineText.width
 
 								-- CACHE this line
 								if (not textwrapIsCached) then
@@ -2203,12 +2217,13 @@ end
 												y = newDisplayLineGroup.y,
 												font=settings.font,
 												fontSize = settings.size,
-												align = textAlignmentForRender,
+												textAlignment = textAlignment,
 												color = settings.color,
 												lineHeight = lineHeight,
 												lineY = lineY,
-												currentSpaceBefore = currentSpaceBefore,
-												xOffset = xOffset,
+												currentSpaceBefore = settings.currentSpaceBefore,
+												xOffset = settings.currentXOffset,
+												currentRenderedLineIndex = currentRenderedLineIndex,
 											})
 								end
 								
@@ -2269,7 +2284,7 @@ end
 						-- Reset margins, cursor, etc. to defaults
 												
 						renderTextFromMargin = true
-						currentXOffset = 0
+						settings.currentXOffset = 0
 						x = 0
 						settings.leftIndent = 0
 						settings.rightIndent = 0
@@ -2293,8 +2308,8 @@ end
 						end
 						setStyleFromTag (tag, attr)
 
-						currentSpaceBefore = settings.spaceBefore
-						currentSpaceAfter = settings.spaceAfter
+						settings.currentSpaceBefore = settings.spaceBefore
+						settings.currentSpaceAfter = settings.spaceAfter
 
 
 						-- LISTS
@@ -2302,7 +2317,7 @@ end
 							-- Nested lists require indentation (which isn't happening yet) and a new line.
 							local indent = 0
 							if (stacks.list[stacks.list.ptr] and stacks.list[stacks.list.ptr].tag) then
-								lineY = lineY + lineHeight + currentSpaceAfter
+								lineY = lineY + lineHeight + settings.currentSpaceAfter
 								-- Indent starting at 2nd level
 								indent = listIdentDistance
 							end
@@ -2334,7 +2349,7 @@ end
 
 					elseif (tag == "br") then
 						renderTextFromMargin = true
-						currentXOffset = 0
+						settings.currentXOffset = 0
 						x = 0
  					end
 
@@ -2344,14 +2359,15 @@ end
 
 					-- LIST ITEMS: add a bullet or number
 					if (tag == "li") then
+						stacks.list[stacks.list.ptr] = stacks.list[stacks.list.ptr] or {}
 						-- default for list is a disk.
 						local t = ""
 						-- If number, use the number instead
 						if (stacks.list[stacks.list.ptr].tag == "ol" ) then
-							t = stacks.list[stacks.list.ptr].line .. ". "
+							t = stacks.list[stacks.list.ptr].line .. ". " or ""
 							stacks.list[stacks.list.ptr].line = stacks.list[stacks.list.ptr].line + 1
 						else
-							t = stacks.list[stacks.list.ptr].bullet
+							t = stacks.list[stacks.list.ptr].bullet or ""
 
 						end
 						-- add a space after the bullet
@@ -2359,7 +2375,9 @@ end
 						local e = renderParsedElement(1, t, "", "")
 						-- Add one to the element counter so the next thing won't be on a new line
 						elementCounter = elementCounter + 1
-						renderedLines[currentRenderedLineIndex]:insert(e)
+						addToCurrentRenderedLine(e, x, lineY, textAlignment, settings, t)
+						settings.currentXOffset = settings.currentXOffset + e.width
+
 					end
 
 
@@ -2386,6 +2404,10 @@ end
 							end
 --print ("B-Tag",tag, element, currentXOffset)
 							local saveStyleSettings = getAllStyleSettings()
+							
+							--if (isFirstLine and tag == "p" or tag == "div" or tag == "li" or tag == "ul") then
+								--element = trim(element)
+							--end
 							local e = renderParsedElement(n, element, tag, attr)
 
 							
@@ -2401,11 +2423,10 @@ end
 					-- Close tags
 					-- AFTER rendering (so add afterspacing!)
 					if (tag == "p" or tag == "div") then
-						--finishedLine(result, renderedLine, settings, textAlignment)
 						currentRenderedLineIndex = currentRenderedLineIndex + 1
 						setStyleFromTag (tag, attr)
 						renderTextFromMargin = true
-						lineY = lineY + currentSpaceAfter
+						lineY = lineY + settings.currentSpaceAfter
 						-- Reset the first line of paragraph flag
 						isFirstLine = true
 						elementCounter = 1
@@ -2413,7 +2434,7 @@ end
 						setStyleFromTag (tag, attr)
 						currentRenderedLineIndex = currentRenderedLineIndex + 1
 						renderTextFromMargin = true
-						lineY = lineY + currentSpaceAfter
+						lineY = lineY + settings.currentSpaceAfter
 						-- Reset the first line of paragraph flag
 						isFirstLine = true
 						elementCounter = 1
@@ -2421,7 +2442,7 @@ end
 						setStyleFromTag (tag, attr)
 						currentRenderedLineIndex = currentRenderedLineIndex + 1
 						renderTextFromMargin = true
-						--lineY = lineY + lineHeight + currentSpaceAfter
+						--lineY = lineY + lineHeight + settings.currentSpaceAfter
 						--leftIndent = settings.leftIndent - stacks.list[stacks.list.ptr].indent
 						stacks.list[stacks.list.ptr] = nil
 						stacks.list.ptr = stacks.list.ptr -1
@@ -2430,7 +2451,7 @@ end
 						setStyleFromTag (tag, attr)
 						currentRenderedLineIndex = currentRenderedLineIndex + 1
 						renderTextFromMargin = true
-						--lineY = lineY + lineHeight + currentSpaceAfter
+						--lineY = lineY + lineHeight + settings.currentSpaceAfter
 						--leftIndent = settings.leftIndent - stacks.list[stacks.list.ptr].indent
 						stacks.list[stacks.list.ptr] = nil
 						stacks.list.ptr = stacks.list.ptr -1
@@ -2438,10 +2459,9 @@ end
 						isFirstLine = true
 						elementCounter = 1
 					elseif (tag == "br") then
-						--finishedLine(result, renderedLine, settings, textAlignment)
 						currentRenderedLineIndex = currentRenderedLineIndex + 1
 						renderTextFromMargin = true
-						currentXOffset = 0
+						settings.currentXOffset = 0
 						setStyleFromTag (tag, attr)
 						lineY = lineY + currentLineHeight
 						-- Reset the first line of paragraph flag
@@ -2452,9 +2472,9 @@ end
 						-- and this will handle them.
 						renderTextFromMargin = true
 						--currentRenderedLineIndex = currentRenderedLineIndex + 1
-						currentXOffset = 0
+						settings.currentXOffset = 0
 						setStyleFromTag (tag, attr)
-						lineY = lineY + currentSpaceAfter
+						lineY = lineY + settings.currentSpaceAfter
 --						elementCounter = 1
 					end
 
@@ -2482,25 +2502,7 @@ end
 				--e.x = 0
 				--e.y = 0
 				
-				
-				------------------------------------------------------------
-				-- ALIGNMENTS
-				-- Align the lines left/right/center
-				------------------------------------------------------------
-				
-				for i,_ in pairs(renderedLines) do
---print ("Get ",i, renderedLinesAlignments[i], renderedLinesStats[i].text)
-					--renderedLines[i].anchorChildren = true
-
-					if (renderedLinesAlignments[i] == "Right") then
-						renderedLines[i].anchorX = 1
-						renderedLines[i].x = currentWidth
-					elseif (renderedLinesAlignments[i] == "Center") then
-						renderedLines[i].anchorX = 0.5
-						renderedLines[i].x = currentWidth/2
-					end
-				end
-						
+				renderedLines = alignRenderedLines(renderedLines, renderedLinesStats)
 
 				return result
 
@@ -2520,15 +2522,15 @@ end
 	-- Finished rendering all blocks of text (all paragraphs).
 	-- Anchor the text block TOP-LEFT by default
 	-----------------------------
-	--result.anchorChildren = true
+	result.anchorChildren = false
+	result.yAdjustment = result.contentBounds.yMin
+	result.anchorChildren = true
 	result.anchorX, result.anchorY = 0,0
 
-	--result.yAdjustment = yAdjustment
-
-	if (testing) then
-		print ("textwrap.lua: yAdjustment is turned OFF because it wasn't working! No idea why.")
-	end
-	result.yAdjustment = 0
+--	if (testing) then
+--		print ("textwrap.lua: yAdjustment is turned OFF because it wasn't working! No idea why.")
+--	end
+	--result.yAdjustment = 0
 
 	saveTextWrapToCache(textUID, cache, baselineCache, cacheDir)
 
@@ -2536,5 +2538,6 @@ end
 end
 
 T.autoWrappedText = autoWrappedText
+T.clearAllCaches = clearAllCaches
 
 return T

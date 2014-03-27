@@ -1,6 +1,6 @@
 -- funx.lua
 --
--- Version 0.3
+-- Version 2.0
 --
 -- Copyright (C) 2014 David I. Gross. All Rights Reserved.
 --
@@ -130,7 +130,7 @@ end
 
 
 -- ------------------------------------------------------------
--- Get index in system table of a system directory
+-- Get the string index in system table of a system directory
 -- ------------------------------------------------------------
 local function indexOfSystemDirectory( systemPath )
 	local i = ""
@@ -4144,7 +4144,7 @@ end
 -------------------------------------------------
 -- Delete a directory even if not empty
 -- If keepDir is true, then only delete the contents
-local function rmDir(dir,path, keepDir)
+local function rmDir(dir, path, keepDir)
 	path = path or system.DocumentsDirectory
 
 	local doc_path = system.pathForFile( dir, path )

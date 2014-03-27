@@ -46,7 +46,7 @@ local midscreenX = screenW*(0.5)
 local midscreenY = screenH*(0.5)
 
 local w = screenW/2
-w = 500
+w = 270
 
 local textStyles = funx.loadTextStyles("textstyles.txt", system.ResourceDirectory)
 
@@ -60,7 +60,7 @@ if (true) then
 end
 
 -- To prevent caching, set the cache dir to empty
-cacheDir = ""
+--cacheDir = ""
 
 local params = {
 	text = mytext,
@@ -89,7 +89,7 @@ local function drawAndDelete(params, reps)
 	local startTime = system.getTimer()
 	reps = reps or 10
 	for i = 1, reps do
-		print ("Render text #" .. i)
+		--print ("Render text #" .. i)
 		local t = textwrap.autoWrappedText(params)
 		t:setReferencePoint(display.TopLeftReferencePoint)
 		t.x = 50
@@ -101,36 +101,72 @@ local function drawAndDelete(params, reps)
 	return tdiff
 end
 
---[[
-local reps = 0
-
-params.cacheDir = ""
-local tdiffNoCache = drawAndDelete(params,reps)
-
-params.cacheDir = cacheDir
-local tdiffCached = drawAndDelete(params, reps)
 
 
-local tmsg = "RENDERING TIME\n"
-local tmsg = tmsg .. "\n### blank\n"
-local tmsg = tmsg .. "NO CACHE: ("..reps.. " times) Time elapsed = " .. math.floor(tdiffNoCache) .. " microseconds (".. tdiffNoCache/1000 .." seconds) (average = " .. (math.floor(tdiffNoCache)/reps) .. " microseconds)"
-local tmsg = tmsg .. "\n### blank,4\n"
-local tmsg = tmsg .. "\nCACHED: ("..reps.. " times) Time elapsed = " .. math.floor(tdiffCached) .. " microseconds (".. tdiffCached/1000 .." seconds) (average = " .. (math.floor(tdiffCached)/reps) .. " microseconds)"
 
-local tout = textwrap.autoWrappedText(tmsg)
-tout:setReferencePoint(display.TopLeftReferencePoint)
-tout.x = 10
-tout.y = 30
 
---]]
+local reps = 1
+local tmsg = ""
+
+if (reps > 10) then 
+	params.cacheDir = ""
+	local tdiffNoCache = drawAndDelete(params,reps)
+
+	params.cacheDir = cacheDir
+	local tdiffCached = drawAndDelete(params, reps)
+
+	------------
+
+	tmsg = "RENDERING TIME\n"
+	tmsg = tmsg .. "<br>"
+	tmsg = tmsg .. "<br>"
+	tmsg = tmsg .. "<br>"
+	tmsg = tmsg .. "<p>"
+	tmsg = tmsg .. "NO CACHE: ("..reps.. " times) Time elapsed = " .. math.floor(tdiffNoCache) .. " microseconds (".. tdiffNoCache/1000 .." seconds) (average = " .. (math.floor(tdiffNoCache)/reps) .. " microseconds)"
+	tmsg = tmsg .. "</p>"
+	tmsg = tmsg .. "<p>"
+	tmsg = tmsg .. "\nCACHED: ("..reps.. " times) Time elapsed = " .. math.floor(tdiffCached) .. " microseconds (".. tdiffCached/1000 .." seconds) (average = " .. (math.floor(tdiffCached)/reps) .. " microseconds)"
+	tmsg = tmsg .. "</p>"
+	--params.text = tmsg
+	--local tout = textwrap.autoWrappedText(tmsg)
+	--tout:setReferencePoint(display.TopLeftReferencePoint)
+	--tout.x = 200
+	--tout.y = 100
+
+
+end
+
+
 ------------
+-- We clear the cache before begining, so first render creates a cache, second uses it.
+textwrap.clearAllCaches(cacheDir)
+
+params.text = mytext .. tmsg
+params.cacheDir = cacheDir
 
 local t = textwrap.autoWrappedText(params)
-t:setReferencePoint(display.TopLeftReferencePoint)
 t.x = 20
-t.y = 100
+t.y = 100 + t.yAdjustment
+
+params.testing = false
+
+params.cacheDir = cacheDir
+local t2 = textwrap.autoWrappedText(params)
+t2.x = w + 50
+t2.y = 100 + t.yAdjustment
+
 
 yAdjustment = t.yAdjustment
+
+-- Frame the text
+local textframe = display.newRect(0,0, w+2, t.height + 2)
+textframe:setFillColor(100,100,0,20) -- transparent
+textframe:setStrokeColor(0,0,0,255)
+textframe.strokeWidth = 1
+textframe:setReferencePoint(display.TopLeftReferencePoint)
+textframe.x = 20
+textframe.y = 100
+textframe:toBack()
 
 
 -- Frame the text
@@ -139,8 +175,8 @@ textframe:setFillColor(100,100,0,20) -- transparent
 textframe:setStrokeColor(0,0,0,255)
 textframe.strokeWidth = 1
 textframe:setReferencePoint(display.TopLeftReferencePoint)
-textframe.x = t.x
-textframe.y = t.y + t.yAdjustment
+textframe.x = t2.x
+textframe.y = 100
 textframe:toBack()
 
 
@@ -151,8 +187,6 @@ bkgd:setReferencePoint(display.TopLeftReferencePoint)
 bkgd.x = 0
 bkgd.y = 0
 bkgd:toBack()
-
-
 
 
 
