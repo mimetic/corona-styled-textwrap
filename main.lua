@@ -46,7 +46,7 @@ local midscreenX = screenW*(0.5)
 local midscreenY = screenH*(0.5)
 
 local w = screenW/2
-w = 401
+w = 500
 
 local textStyles = funx.loadTextStyles("textstyles.txt", system.ResourceDirectory)
 
@@ -128,17 +128,19 @@ tout.y = 30
 local t = textwrap.autoWrappedText(params)
 t:setReferencePoint(display.TopLeftReferencePoint)
 t.x = 20
-t.y = 40
+t.y = 100
+
+yAdjustment = t.yAdjustment
 
 
 -- Frame the text
 local textframe = display.newRect(0,0, w+2, t.height + 2)
 textframe:setFillColor(100,100,0,20) -- transparent
 textframe:setStrokeColor(0,0,0,255)
-textframe.strokeWidth = 3
+textframe.strokeWidth = 1
 textframe:setReferencePoint(display.TopLeftReferencePoint)
-textframe.x = t.x - 1
-textframe.y = t.y - 1
+textframe.x = t.x
+textframe.y = t.y + t.yAdjustment
 textframe:toBack()
 
 
@@ -176,3 +178,4 @@ bkgd:toBack()
 				onRelease = toggleWireframe,
 			}
 	wfb:toFront()
+
