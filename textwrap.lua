@@ -1616,6 +1616,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 									settings.currentFirstLineIndent = cachedItem.currentFirstLineIndent
 									settings.leftIndent = cachedItem.leftIndent
 									settings.rightIndent = cachedItem.rightIndent
+									-- We capture the x-position, so we don't need this which is used by addToCurrentRenderedLine
+									settings.currentXOffset = 0
 		
 									textDisplayReferencePoint = "BottomLeft"
 		
@@ -1800,7 +1802,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 															settings.currentLeftIndent = settings.leftIndent
 															settings.currentXOffset = 0
 														else
-															settings.currentXOffset = settings.currentXOffset
 															settings.currentFirstLineIndent = 0
 															settings.currentLeftIndent = 0
 														end
@@ -1855,7 +1856,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 																		rightIndent = settings.rightIndent,
 
 																	
-																		xOffset = settings.currentXOffset,
+																		currentXOffset = settings.currentXOffset,
 
 																		renderTextFromMargin = renderTextFromMargin,
 																		isFirstLine = isFirstLine,
@@ -1983,7 +1984,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 		print ("\nrenderTextFromMargin reset to TRUE.")
 		print ("isFirstLine", isFirstLine)
 		print ("   newDisplayLineGroup.y",lineY + descent, descent)
-		print ("leftIndent + currentFirstLineIndent + xOffset", settings.leftIndent, settings.currentFirstLineIndent, settings.currentXOffset)
+		print ("leftIndent + currentFirstLineIndent", settings.leftIndent, settings.currentFirstLineIndent, settings.currentXOffset)
 	end
 
 														if (isFirstLine) then
@@ -2009,7 +2010,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 															settings.currentLeftIndent = settings.leftIndent
 															settings.currentXOffset = 0
 														else
-															settings.currentXOffset = settings.currentXOffset
 															settings.currentFirstLineIndent = 0
 															settings.currentLeftIndent = 0
 														end
@@ -2038,19 +2038,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 														end
 
 														addToCurrentRenderedLine(newDisplayLineGroup, x, lineY, textAlignment, settings, word)
-														currentRenderedLineIndex = currentRenderedLineIndex + 1
 													
-														lineCount = lineCount + 1
-														currentLine = ''
-
-														-- Use once, then set to zero.
-														settings.currentFirstLineIndent = 0
-
-														-- <A> tag box. If we make the text itself touchable, it is easy to miss it...your touch
-														-- goes through the white spaces around letter strokes!
-														createLinkingBox(newDisplayLineGroup, newDisplayLineText, currentLine, {250,0,250,30} )
-
-
 														-- CACHE this line
 														if (not textwrapIsCached) then
 															updateCachedChunk (cachedChunk, { 
@@ -2076,7 +2064,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 																		rightIndent = settings.rightIndent,
 
 																	
-																		xOffset = settings.currentXOffset,
+																		currentXOffset = settings.currentXOffset,
 
 																		renderTextFromMargin = renderTextFromMargin,
 																		isFirstLine = isFirstLine,
@@ -2085,6 +2073,17 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 																	})
 														end
 													
+														currentRenderedLineIndex = currentRenderedLineIndex + 1
+														lineCount = lineCount + 1
+														currentLine = ''
+
+														-- Use once, then set to zero.
+														settings.currentFirstLineIndent = 0
+
+														-- <A> tag box. If we make the text itself touchable, it is easy to miss it...your touch
+														-- goes through the white spaces around letter strokes!
+														createLinkingBox(newDisplayLineGroup, newDisplayLineText, currentLine, {250,0,250,30} )
+
 														cachedChunkIndex = cachedChunkIndex + 1
 
 
@@ -2183,7 +2182,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 										settings.currentXOffset = 0
 										settings.currentLeftIndent = settings.leftIndent
 									else
-										settings.currentXOffset = settings.currentXOffset
 										settings.currentFirstLineIndent = 0
 										settings.currentLeftIndent = 0
 									end
@@ -2218,8 +2216,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 
 									addToCurrentRenderedLine(newDisplayLineGroup, x, lineY, textAlignment, settings, currentLine)
 
-									settings.currentXOffset = settings.currentXOffset + newDisplayLineText.width
-
 									-- CACHE this line
 									if (not textwrapIsCached) then
 										updateCachedChunk (cachedChunk, { 
@@ -2245,7 +2241,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 													rightIndent = settings.rightIndent,
 
 												
-													xOffset = settings.currentXOffset,
+													currentXOffset = settings.currentXOffset,
 
 													renderTextFromMargin = renderTextFromMargin,
 													isFirstLine = isFirstLine,
@@ -2254,6 +2250,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 												})
 									end
 								
+									settings.currentXOffset = settings.currentXOffset + newDisplayLineText.width
+
 									cachedChunkIndex = cachedChunkIndex + 1
 
 
