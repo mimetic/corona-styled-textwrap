@@ -79,9 +79,9 @@ local function showTestLine(group, y, isFirstTextInBlock, i)
 	local q = display.newLine(group, 0,y,200,y)
 	i = i or 1
 	if (isFirstTextInBlock) then
-		q:setColor(250,0,0)
+		q:setStrokeColor(250,0,0)
 	else
-		q:setColor(80 * i,80 * i, 80)
+		q:setStrokeColor(80 * i,80 * i, 80)
 	end
 	q.strokeWidth = 2
 end
@@ -301,10 +301,8 @@ end
 local function loadTextWrapFromCache(id, cacheDir)
 	if (cacheDir) then
 		local fn = cacheDir .. "/" .. textWrapCacheDir .. "/" ..  id .. ".json"
-
 		if (funx.fileExists(fn, system.CachesDirectory)) then
 			local c = funx.loadTable(fn, system.CachesDirectory)
---print ("cacheTemplatizedPage: found page "..fn )
 			return c
 		end
 	end
@@ -365,7 +363,7 @@ local function touchableBox(g, referencePoint, x,y, width, height, fillColor)
 	funx.setFillColorFromString(touchme, fillColor)
 
 	g:insert(touchme)
-	touchme:setReferencePoint(referencePoint)
+	funx.anchor(touchme, referencePoint)
 	touchme.x = x
 	touchme.y = y
 	touchme:toBack()
@@ -1227,7 +1225,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 				local r = display.newRect(0,0,width,2)
 				r:setFillColor(100,250,0)
 				result:insert(r)
-				r:setReferencePoint(display.TopLeftReferencePoint)
+				funx.anchor(r, "TopLeft")
 				r.x = 0
 				r.y = 0
 				r.isVisible = testing
@@ -1240,7 +1238,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 				else
 					textAlignment = "Left"
 				end
-				textDisplayReferencePoint = display["Bottom"..textAlignment.."ReferencePoint"]
+				textDisplayReferencePoint = "Bottom"..textAlignment
 
 				local shortword = ""
 				local restOLineLen = strlen(restOLine)
@@ -1293,7 +1291,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 						--[[
 						--print ("Here is a sample : ", substring(line, 50) )
 
-						result:setReferencePoint(display.CenterReferencePoint)
+						funx.anchor(result, "Center")
 						result.yAdjustment = yAdjustment
 						return result
 						--]]
@@ -1401,7 +1399,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 								local r = display.newRect(0, 0, newDisplayLineText.width-2, newDisplayLineText.height-2)
 								r.strokeWidth=1
 								newDisplayLineGroup:insert(r)
-								r:setReferencePoint(textDisplayReferencePoint)
+								funx.anchor(r, textDisplayReferencePoint)
 								r.x = newDisplayLineText.x+1
 								r.y = newDisplayLineText.y+1
 
@@ -1528,7 +1526,7 @@ if (not settings.width) then print ("textwrap: line 844: Damn, the width is wack
 							result.anchorX, result.anchorY = 0, 0
 
 							-- Set the reference point to match the text alignment
-							textDisplayReferencePoint = display["Bottom"..textAlignment.."ReferencePoint"]
+							textDisplayReferencePoint = "Bottom"..textAlignment
 
 							-- Preserve initial padding before first word
 							local  _, _, padding = find(nextChunk, "^([%s%-]*)")
@@ -1599,8 +1597,9 @@ if (textwrapIsCached) then
 		currentSpaceBefore = cachedItem.currentSpaceBefore
 		lineHeight = cachedItem.lineHeight
 		xOffset = cachedItem.xOffset
-		
-		textDisplayReferencePoint = display["Bottom"..textAlignment.."ReferencePoint"]
+		textAlignment = cachedItem.align
+		textDisplayReferencePoint = "Bottom"..textAlignment
+
 		
 
 								local newDisplayLineGroup = display.newGroup()
@@ -1616,17 +1615,27 @@ if (textwrapIsCached) then
 									fontSize = cachedItem.fontSize,
 									align = cachedItem.align,
 								})
-
 								newDisplayLineText:setFillColor(unpack(cachedItem.color))
-								newDisplayLineText:setReferencePoint(textDisplayReferencePoint)
+								funx.anchor(newDisplayLineText, textDisplayReferencePoint)
 								newDisplayLineText.x, newDisplayLineText.y = 0,0
 								--newDisplayLineText.alpha = settings.opacity
 
 								result:insert(newDisplayLineGroup)
-								newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
+								funx.anchor(newDisplayLineGroup, textDisplayReferencePoint)
 								newDisplayLineGroup.x, newDisplayLineGroup.y = cachedItem.x, cachedItem.y
-
 								--positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
+
+								-- For allowing centered/right text to be positioned on the line:
+								local ta = lower(textAlignment)
+								if (ta == "center") then
+									local q = display.newRect(newDisplayLineGroup, 0,0,settings.width, 1)
+									q.anchorX = 0.5
+									q.isVisible = testing
+								elseif ( ta=="right") then
+									local q = display.newRect(newDisplayLineGroup, 0,0,settings.width, 1)
+									q.anchorX = 1
+									q.isVisible = testing
+								end
 
 								lineCount = lineCount + 1
 
@@ -1701,10 +1710,10 @@ else
 												y=0,
 												font = settings.font,
 												fontSize = settings.size,
-												align = textAlignmentForRender or "left",
+												align = textAlignment or "Left",
 											})
 
-											tempDisplayLineTxt:setReferencePoint(display.TopLeftReferencePoint)
+											funx.anchor(tempDisplayLineTxt, "TopLeft")
 											tempDisplayLineTxt.x = 0
 											tempDisplayLineTxt.y = 0
 											
@@ -1822,12 +1831,12 @@ else
 														align = textAlignmentForRender,
 													})
 													newDisplayLineText:setFillColor(unpack(settings.color))
-													newDisplayLineText:setReferencePoint(textDisplayReferencePoint)
+													funx.anchor(newDisplayLineText, textDisplayReferencePoint)
 													newDisplayLineText.x, newDisplayLineText.y = 0, 0
 													--newDisplayLineText.alpha = settings.opacity
 
 													result:insert(newDisplayLineGroup)
-													newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
+													funx.anchor(newDisplayLineGroup, textDisplayReferencePoint)
 
 													-- Adjust Y to the baseline, not top-left corner of the font bounding-box
 													newDisplayLineGroup.y = lineY + baselineAdjustment
@@ -1844,7 +1853,7 @@ else
 																	y = newDisplayLineGroup.y,
 																	font=settings.font,
 																	fontSize = settings.size,
-																	align = textAlignmentForRender,
+																	align = textAlignment,
 																	color = settings.color,
 																	lineHeight = lineHeight,
 																	lineY = lineY,
@@ -2011,12 +2020,12 @@ end
 													})
 
 													newDisplayLineText:setFillColor(unpack(settings.color))
-													newDisplayLineText:setReferencePoint(textDisplayReferencePoint)
+													funx.anchor(newDisplayLineText, textDisplayReferencePoint)
 													newDisplayLineText.x, newDisplayLineText.y = 0, 0
 													--newDisplayLineText.alpha = settings.opacity
 
 													result:insert(newDisplayLineGroup)
-													newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
+													funx.anchor(newDisplayLineGroup, textDisplayReferencePoint)
 													newDisplayLineGroup.x, newDisplayLineGroup.y = x, lineY + baselineAdjustment
 
 													positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
@@ -2042,7 +2051,7 @@ end
 																	y = newDisplayLineGroup.y,
 																	font=settings.font,
 																	fontSize = settings.size,
-																	align = textAlignmentForRender,
+																	align = textAlignment,
 																	color = settings.color,
 																	lineHeight = lineHeight,
 																	lineY = lineY,
@@ -2187,22 +2196,25 @@ end
 									align = textAlignmentForRender,
 								})
 								newDisplayLineText:setFillColor(unpack(settings.color))
-								newDisplayLineText:setReferencePoint(textDisplayReferencePoint)
+								funx.anchor(newDisplayLineText, textDisplayReferencePoint)
 								newDisplayLineText.x, newDisplayLineText.y = 0, 0
 								--newDisplayLineText.alpha = settings.opacity
 
 								result:insert(newDisplayLineGroup)
-								newDisplayLineGroup:setReferencePoint(textDisplayReferencePoint)
+								funx.anchor(newDisplayLineGroup, textDisplayReferencePoint)
 								newDisplayLineGroup.x = x
 								newDisplayLineGroup.y = lineY + baselineAdjustment
-
 								positionNewDisplayLineX(newDisplayLineGroup, xOffset, currentWidth)
-
 								-- For allowing centered/right text to be positioned on the line:
 								local ta = lower(textAlignment)
-								if (ta == "center" or ta=="right") then
+								if (ta == "center") then
 									local q = display.newRect(newDisplayLineGroup, 0,0,settings.width, 1)
-									q.isVisible = false
+									q.anchorX = 0.5
+									q.isVisible = testing
+								elseif ( ta=="right") then
+									local q = display.newRect(newDisplayLineGroup, 0,0,settings.width, 1)
+									q.anchorX = 1
+									q.isVisible = testing
 								end
 
 
@@ -2213,7 +2225,7 @@ end
 								-- We know this is a short line, and it is possible the next chunk of text
 								-- will begin on the same line, so we capture the x value. So, set the
 								-- currentXOffset value so the next text starts in the right column.
-								setCurrentXOffset(newDisplayLineText, xOffset)
+								setCurrentXOffset(newDisplayLineGroup, xOffset)
 
 								-- CACHE this line
 								if (not textwrapIsCached) then
@@ -2225,7 +2237,7 @@ end
 												y = newDisplayLineGroup.y,
 												font=settings.font,
 												fontSize = settings.size,
-												align = textAlignmentForRender,
+												align = textAlignment,
 												color = settings.color,
 												lineHeight = lineHeight,
 												lineY = lineY,
@@ -2479,7 +2491,7 @@ end
 
 				-- This keeps centered/right aligned objects in the right place
 				-- The line is built inside a rect of the correct width
-				--e:setReferencePoint(display["Center" .. textAlignment .. "ReferencePoint"])
+				--funx.anchor(e, "Center" .. textAlignment)
 				--e.x = 0
 				--e.y = 0
 
