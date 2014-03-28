@@ -1,8 +1,8 @@
 -- textwrap.lua
 --
--- Version 2.1
+-- Version 3.0
 --
--- Copyright (C) 2013 David I. Gross. All Rights Reserved.
+-- Copyright (C) 2014 David I. Gross. All Rights Reserved.
 --
 -- This software is is protected by the author's copyright, and may not be used, copied,
 -- modified, merged, published, distributed, sublicensed, and/or sold, without
@@ -18,6 +18,13 @@
 -- OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 -- DEALINGS IN THE SOFTWARE.
 --
+--[[
+	This version renders lines of text, then aligns them left/right/center. The previous version
+	could not do this with sub-elements in a block, e.g. 
+		<p>my text <span>is cool</span> but not hot.</p>
+	would have failed.
+
+--]]
 --[[
 
 	Create a block text, wrapped to fit a rectangular boundary.
