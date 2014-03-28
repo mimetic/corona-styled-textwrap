@@ -1,14 +1,14 @@
-<p class="Right">One of the most distinguishing features of this species is the bold dark-bars draped across the dorsal surface. Additional dark spots are found along the lateral surfaces of the species. In adult specimens, the pectoral fins are broadly triangular.</p>
+<p class="Left">One of the most distinguishing features of this species is the bold dark-bars draped across the dorsal surface. Additional dark spots are found along the lateral surfaces of the species. In adult specimens, the pectoral fins are broadly triangular.</p>
 <br>
 <br>
 <p class="Left" >
-	<span>David Gross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span> Ooga booga boo.
+	<span>Center McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span> are great people who love to eat super-duper-wooper all day.
 </p>
-<br/>
+<br/><br/>
 <p class="Right" >
-	<span>David Gross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span> Ooga booga boo.
+	<span>Center McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span> are great people who love to eat super-duper-wooper all day.
 </p>
-<br/>
+<br/><br/>
 <p class="Center" >
 	<span>Center McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span> are great people who love to eat super-duper-wooper all day.
 </p>

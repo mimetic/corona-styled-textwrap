@@ -45,8 +45,8 @@ local screenOffsetW, screenOffsetH = display.contentWidth -	 display.viewableCon
 local midscreenX = screenW*(0.5)
 local midscreenY = screenH*(0.5)
 
-local w = screenW/2
-w = 270
+local w = screenW/2 - 50
+--w = 270
 
 local textStyles = funx.loadTextStyles("textstyles.txt", system.ResourceDirectory)
 
@@ -58,6 +58,19 @@ if (true) then
 	funx.mkdir ("textrender_cache", "",false, system.CachesDirectory)
 	cacheDir = "textrender_cache"
 end
+
+
+
+------------------------------------------------------------
+------------------------------------------------------------
+
+local reps = 50
+
+------------------------------------------------------------
+------------------------------------------------------------
+
+
+
 
 -- To prevent caching, set the cache dir to empty
 --cacheDir = ""
@@ -104,80 +117,9 @@ end
 
 
 
-
-local reps = 1
 local tmsg = ""
 
-if (reps > 10) then 
-	params.cacheDir = ""
-	local tdiffNoCache = drawAndDelete(params,reps)
 
-	params.cacheDir = cacheDir
-	local tdiffCached = drawAndDelete(params, reps)
-
-	------------
-
-	tmsg = "RENDERING TIME\n"
-	tmsg = tmsg .. "<br>"
-	tmsg = tmsg .. "<br>"
-	tmsg = tmsg .. "<br>"
-	tmsg = tmsg .. "<p>"
-	tmsg = tmsg .. "NO CACHE: ("..reps.. " times) Time elapsed = " .. math.floor(tdiffNoCache) .. " microseconds (".. tdiffNoCache/1000 .." seconds) (average = " .. (math.floor(tdiffNoCache)/reps) .. " microseconds)"
-	tmsg = tmsg .. "</p>"
-	tmsg = tmsg .. "<p>"
-	tmsg = tmsg .. "\nCACHED: ("..reps.. " times) Time elapsed = " .. math.floor(tdiffCached) .. " microseconds (".. tdiffCached/1000 .." seconds) (average = " .. (math.floor(tdiffCached)/reps) .. " microseconds)"
-	tmsg = tmsg .. "</p>"
-	--params.text = tmsg
-	--local tout = textwrap.autoWrappedText(tmsg)
-	--tout:setReferencePoint(display.TopLeftReferencePoint)
-	--tout.x = 200
-	--tout.y = 100
-
-
-end
-
-
-------------
--- We clear the cache before begining, so first render creates a cache, second uses it.
-textwrap.clearAllCaches(cacheDir)
-
-params.text = mytext .. tmsg
-params.cacheDir = cacheDir
-
-local t = textwrap.autoWrappedText(params)
-t.x = 20
-t.y = 100 + t.yAdjustment
-
-params.testing = false
-
-params.cacheDir = cacheDir
-local t2 = textwrap.autoWrappedText(params)
-t2.x = w + 50
-t2.y = 100 + t.yAdjustment
-
-
-yAdjustment = t.yAdjustment
-
--- Frame the text
-local textframe = display.newRect(0,0, w+2, t.height + 2)
-textframe:setFillColor(100,100,0,20) -- transparent
-textframe:setStrokeColor(0,0,0,255)
-textframe.strokeWidth = 1
-textframe:setReferencePoint(display.TopLeftReferencePoint)
-textframe.x = 20
-textframe.y = 100
-textframe:toBack()
-
-
--- Frame the text
-local textframe = display.newRect(0,0, w+2, t.height + 2)
-textframe:setFillColor(100,100,0,20) -- transparent
-textframe:setStrokeColor(0,0,0,255)
-textframe.strokeWidth = 1
-textframe:setReferencePoint(display.TopLeftReferencePoint)
-textframe.x = t2.x
-textframe.y = 100
-textframe:toBack()
 
 
 -- Page background
@@ -186,28 +128,149 @@ bkgd:setFillColor(255,255,255,255)
 bkgd:setReferencePoint(display.TopLeftReferencePoint)
 bkgd.x = 0
 bkgd.y = 0
-bkgd:toBack()
+bkgd.strokeWidth = 20
+bkgd:setStrokeColor(0,200,200)
 
+local t, t2, textframe, textframe2
+local gobutton
 
+local function go()
 
-	local widget = require ( "widget" )
-	local wf = false
-	local function toggleWireframe()
-		wf = not wf
-		display.setDrawMode( "wireframe", wf )
-		if (not wf) then
-			display.setDrawMode( "forceRender" )
-		end
-		print ("WF = ",wf)
+	gobutton.isVisible = false
+
+	------------
+	-- We clear the cache before begining, so first render creates a cache, second uses it.
+	textwrap.clearAllCaches(cacheDir)
+
+	if t then 
+		t:removeSelf()
+		t = nil
 	end
 
-	local wfb = widget.newButton{
-				label = "WIREFRAME",
-				labelColor = { default={ 200, 1, 1 }, over={ 250, 0, 0, 0.5 } },
-				fontSize = 20,
-				x =screenW - 100,
-				y=50,
-				onRelease = toggleWireframe,
-			}
-	wfb:toFront()
+	if t2 then 
+		t2:removeSelf()
+		t2 = nil
+	end
 
+	if textframe then 
+		textframe:removeSelf()
+		textframe = nil
+	end
+
+	if textframe2 then 
+		textframe2:removeSelf()
+		textframe2 = nil
+	end
+
+
+	if (reps > 10) then 
+		params.cacheDir = ""
+		local tdiffNoCache = drawAndDelete(params,reps)
+
+		params.cacheDir = cacheDir
+		local tdiffCached = drawAndDelete(params, reps)
+
+		------------
+
+		tmsg = "RENDERING TIME\n"
+		tmsg = tmsg .. "<br>"
+		tmsg = tmsg .. "<br>"
+		tmsg = tmsg .. "<br>"
+		tmsg = tmsg .. "<p>"
+		tmsg = tmsg .. "NO CACHE: ("..reps.. " times) Time elapsed = " .. math.floor(tdiffNoCache) .. " microseconds (".. tdiffNoCache/1000 .." seconds) (average = " .. (math.floor(tdiffNoCache)/reps) .. " microseconds)"
+		tmsg = tmsg .. "</p>"
+		tmsg = tmsg .. "<p>"
+		tmsg = tmsg .. "\nCACHED: ("..reps.. " times) Time elapsed = " .. math.floor(tdiffCached) .. " microseconds (".. tdiffCached/1000 .." seconds) (average = " .. (math.floor(tdiffCached)/reps) .. " microseconds)"
+		tmsg = tmsg .. "</p>"
+		--params.text = tmsg
+		--local tout = textwrap.autoWrappedText(tmsg)
+		--tout:setReferencePoint(display.TopLeftReferencePoint)
+		--tout.x = 200
+		--tout.y = 100
+
+
+	end
+
+
+	params.text = mytext .. tmsg
+	params.cacheDir = cacheDir
+
+	t = textwrap.autoWrappedText(params)
+	t.x = 20
+	t.y = 100 + t.yAdjustment
+
+	params.testing = false
+
+	params.cacheDir = cacheDir
+	t2 = textwrap.autoWrappedText(params)
+	t2.x = w + 50
+	t2.y = 100 + t.yAdjustment
+
+
+	yAdjustment = t.yAdjustment
+
+	-- Frame the text
+	textframe = display.newRect(0,0, w+2, t.height + 2)
+	textframe:setFillColor(100,100,0,20) -- transparent
+	textframe:setStrokeColor(0,0,0,255)
+	textframe.strokeWidth = 1
+	textframe:setReferencePoint(display.TopLeftReferencePoint)
+	textframe.x = 20
+	textframe.y = 100
+	textframe:toBack()
+
+
+	-- Frame the text
+	textframe2 = display.newRect(0,0, w+2, t.height + 2)
+	textframe2:setFillColor(100,100,0,20) -- transparent
+	textframe2:setStrokeColor(0,0,0,255)
+	textframe2.strokeWidth = 1
+	textframe2:setReferencePoint(display.TopLeftReferencePoint)
+	textframe2.x = t2.x
+	textframe2.y = 100
+	textframe2:toBack()
+	
+	bkgd:toBack()
+	
+	gobutton.isVisible = true
+
+end
+
+
+
+local widget = require ( "widget" )
+local wf = false
+local function toggleWireframe()
+	wf = not wf
+	display.setDrawMode( "wireframe", wf )
+	if (not wf) then
+		display.setDrawMode( "forceRender" )
+	end
+	print ("WF = ",wf)
+end
+
+local wfb = widget.newButton{
+			label = "WIREFRAME",
+			labelColor = { default={ 200, 1, 1 }, over={ 250, 0, 0, 0.5 } },
+			fontSize = 20,
+			x =screenW - 100,
+			y=50,
+			onRelease = toggleWireframe,
+		}
+wfb:toFront()
+
+
+gobutton = widget.newButton{
+			label = "GO",
+			labelColor = { default={ 200, 1, 1 }, over={ 250, 0, 0, 0.5 } },
+			fontSize = 20,
+			x =screenW - 200,
+			y=50,
+			onRelease = go,
+		}
+gobutton:toFront()
+
+-- Run if we're not testing reps
+if (reps == 1) then
+	go()
+end
