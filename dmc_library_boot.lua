@@ -184,7 +184,7 @@ function Utils.readConfigFile( file_path, options )
 	for _, line in ipairs( contents ) do
 		-- print( line )
 		is_section = ( string.find( line, '%[%w', 1, false ) == 1 )
-		is_key = ( string.find( line, '%w', 1, false ) == 1 )
+		local is_key = ( string.find( line, '%w', 1, false ) == 1 )
 		-- print( is_section, is_key )
 
 		if is_section then

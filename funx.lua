@@ -57,10 +57,6 @@ local TRANSPARENT = 0
 
 
 
-
-
-
-
 -- -------------------------------------------------------------
 -- GRAPHICS 2.0 POSITIONING
 -- ------------------------------------------------------------
@@ -85,6 +81,11 @@ local function anchor(obj, pos)
 	elseif pos == "BottomLeft"   then obj.anchorX, obj.anchorY = 0, 1
 	elseif pos == "BottomCenter" then obj.anchorX, obj.anchorY = 0.5, 1
 	elseif pos == "BottomRight"  then obj.anchorX, obj.anchorY = 1, 1
+
+	elseif pos == "Left"      then obj.anchorX = 0
+	elseif pos == "Right"     then obj.anchorX = 1
+	elseif pos == "Top"  	  then obj.anchorY = 0
+	elseif pos == "Bottom"  	  then obj.anchorY = 1
 
 	elseif pos == "TopLeftReferencePoint"      then obj.anchorX, obj.anchorY = 0, 0
 	elseif pos == "TopCenterReferencePoint"    then obj.anchorX, obj.anchorY = 0.5, 0
@@ -290,28 +291,6 @@ local function tablelength (t)
 end
 
 
--- Delete fields of the form {{x}} in the string s
-local function removeFields (s)
-	if (not s) then return nil end
-	local r = gfind(s,"%{%{.-%}%}")
-	local res = s
-	for w in r do
-		res = trim(string.gsub(res, w, ""))
-	end
-	return res
-end
-
--- Delete fields of the form {x} in the string s
-local function removeFieldsSingle (s)
-	if (not s) then return nil end
-	local r = gfind(s,"%b{}")
-	local res = s
-	for w in r do
-		res = trim(string.gsub(res, w, ""))
-	end
-	return res
-end
-
 --===========
 --- Escape keys in tables so the key name can be used in a gsub search/replace
 -- @param t Table with keys that might need escaping
@@ -353,11 +332,11 @@ local function substitutions (s, t, escapeTheKeys)
 	end
 
 	local r = gfind(s,"%{%{(.-)%}%}")
-	for w in r do
-		local searchTerm = tclean[w] or w
-		if (t[w]) then
-			s = gsub(s, "{{"..searchTerm.."}}", t[w])
---print ("{{"..searchTerm.."}}", t[w],s)
+	for wrd in r do
+		local searchTerm = tclean[wrd] or wrd
+		if (t[wrd]) then
+			s = gsub(s, "{{"..searchTerm.."}}", t[wrd])
+--print ("{{"..searchTerm.."}}", t[wrd],s)
 		end
 	end
 	return s
@@ -376,11 +355,11 @@ local function OLD_substitutionsSLOWER (s, t)
 	--local r = gfind(s,"%b{}")
 	local r = gfind(s,"%{%{.-%}%}")
 	local res = s
-	for w in r do
-		local i,j = string.find(w, "%{%{(.-)%}%}")
-		local k = string.sub(w,i+2,j-2)
+	for wrd in r do
+		local i,j = string.find(wrd, "%{%{(.-)%}%}")
+		local k = string.sub(wrd,i+2,j-2)
 		if (t[k]) then
-			res = string.gsub(res, w, t[k])
+			res = string.gsub(res, wrd, t[k])
 		end
 --print ("substitutions for in "..res.." for {{"..k.."}} with ",t[k], "RESULT:",res)
 
@@ -404,7 +383,8 @@ local function tableSubstitutions(t, subs, escapeTheKeys)
 	if (type(subs) ~= "table" or not subs or subs == {} ) then
 		return t
 	end
-
+	
+	local tclean
 	if (escapeTheKeys) then
 		if (type(escapeTheKeys) == "table") then
 			tclean = escapeTheKeys
@@ -491,19 +471,20 @@ end
 -- If the string is {{xxx}} then the field name is "xxx"
 local function getElementName (s)
 	local r = gfind(s,"%{%{(.-)%}%}")
-	local res = "RESULT: "..s
-	for w in r do
-		print ("extracted ",w)
+	local res = ""
+	for wrd in r do
+		print ("extracted ",wrd)
+		res = wrd
 		break
 	end
-	return w
+	return res
 end
 
 
 -- Dump an XML table
-local function dump(_class, no_func, depth)
+local function dumptable(_class, no_func, depth)
 	if (not _class) then
-		print ("dump: not a class.");
+		print ("dumptable: not a class.");
 		return;
 	end
 
@@ -529,7 +510,7 @@ local function dump(_class, no_func, depth)
 								print (str.."\t"..tostring(i).." = (not expanding this internal table)");
 				else
 					print (str.."\t"..tostring(i).." =");
-					dump(field, no_func, depth+1);
+					dumptable(field, no_func, depth+1);
 				end
 			else
 				if(type(field)=="number") then
@@ -641,6 +622,28 @@ local function rtrim(s, returnNil)
 	return s
 end
 
+
+-- Delete fields of the form {{x}} in the string s
+local function removeFields (s)
+	if (not s) then return nil end
+	local r = gfind(s,"%{%{.-%}%}")
+	local res = s
+	for wrd in r do
+		res = trim(string.gsub(res, wrd, ""))
+	end
+	return res
+end
+
+-- Delete fields of the form {x} in the string s
+local function removeFieldsSingle (s)
+	if (not s) then return nil end
+	local r = gfind(s,"%b{}")
+	local res = s
+	for wrd in r do
+		res = trim(string.gsub(res, wrd, ""))
+	end
+	return res
+end
 
 
 --------------------------------------------------------
@@ -926,13 +929,13 @@ end
 local function saveTableToFile(filePath, dataTable)
 
 	--local levelseq = table.concat( levelArray, "-" )
-	file = io.open( filePath, "w" )
+	local myfile = io.open( filePath, "w" )
 
 	for k,v in pairs( dataTable ) do
-		file:write( k .. "=" .. v .. "," )
+		myfile:write( k .. "=" .. v .. "," )
 	end
 
-	io.close( file )
+	io.close( myfile )
 end
 
 
@@ -1304,13 +1307,14 @@ end
 local function hasNetConnection(url,showActivity)
 	local socket = require("socket")
 	local test = socket.tcp()
-	test:settimeout(1, 't') -- timeout 1 sec
+	test:settimeout(1, 't') -- timeout 5 sec
 
 	url = url or "www.google.com"
 	if (string.sub(url, 1, 4) == "http") then
 		url = url:gsub("^https?://", "")
 	end
 	local testResult = test:connect(url,80)
+	test:close()
 
 	if (testResult == nil) then
 		if (showActivity) then native.setActivityIndicator( false ) end
@@ -1340,17 +1344,18 @@ local function canConnectWithServer(url, showActivity, callback, testing)
 					print("IsReachableViaCellular", event.isReachableViaCellular)
 					print("IsReachableViaWiFi", event.isReachableViaWiFi)
 
-					print("removing event listener")
 				end
 				network.setStatusListener( url, nil)
 
 				-- Simulator bug or something...always returns failure
+				
 				local isSimulator = "simulator" == system.getInfo("environment")
 
 				if (isSimulator) then
 					event.isReachable = true
-					print ("canConnectWithServer: Corona simulator: Forcing a TRUE for event.isReachable because this fails in simulator.")
+					print ("funx.canConnectWithServer: Corona simulator: Forcing a TRUE for event.isReachable because this fails in simulator.")
 				end
+				
 
 				-- Turn OFF native busy activity indicator
 				if (showActivity) then
@@ -1493,7 +1498,7 @@ local function frameGroup(g, s, color)
 	r:setFillColor(255,0,0, 50)
 	
 	r:toBack()
-	r.anchorX, r.anchorY = 0, 0
+	r.anchorX, r.anchorY = 0,0
 	r.x, r.y = bounds.xMin, bounds.yMin
 end
 
@@ -1512,7 +1517,8 @@ end
 local function dimScreen(transitionTime, color, scaling, locked)
 
 	transitionTime = transitionTime or 300
-	opacity = applyPercent(opacity,1) or 190/255
+	color = color or { 0.75 * OPAQUE }
+	local opacity = applyPercent(color[4],OPAQUE) or (0.75 * OPAQUE)
 	scaling = scaling or 1
 	local c = stringToColorTable(color or "55,55,55,75%")
 	-- cover all rect, darken background
@@ -1546,6 +1552,174 @@ local function undimScreen(handle, transitionTime, f)
 	end
 
 	transition.to (handle, {alpha=0, time=t, onComplete=killme } )
+end
+
+
+
+-------------------------------------------------
+-- Shrink the obj away until it is small, then disappear it.
+-- Restore its size when done, but leave it hidden
+-- Default is shrink to center, but can set destX, destY
+local function shrinkAway (obj, callback, transitionSpeed, destX, destY)
+
+	destX = destX or midscreenX
+	destY = destY or midscreenY
+
+	local xs = obj.yScale
+	local ys = obj.xScale
+	local w = obj.width
+	local h = obj.height
+	local a = obj.alpha
+
+		local function cb()
+			obj.xScale = xs
+			obj.yScale = ys
+			obj.width = w
+			obj.height = h
+			obj.alpha = a
+			obj.isVisible = false
+			callback()
+		end
+
+	callback = callback or nil
+	local t = transitionSpeed or 500
+	anchor(obj, "Center")
+	transition.to( obj,  { time=t, xScale=0.01, yScale=0.01, alpha=0, x=destX, y=destY, onComplete=cb } )
+end
+
+
+
+-------------------------------------------------
+local function fadeOut (obj, callback, transitionSpeed)
+	callback = callback or nil
+	if (type(callback) ~= "function") then callback = nil end
+
+	local function myCallback()
+		obj._isTweening = false
+		if (callback) then callback() end
+	end
+
+	local t = transitionSpeed or 500
+	transition.to( obj,  { time=t, alpha=0, onComplete=myCallback } )
+	obj._isTweening = true
+end
+
+-------------------------------------------------
+local function fadeIn (obj, callback, transitionSpeed)
+	callback = callback or nil
+	if (type(callback) ~= "function") then callback = nil end
+
+	local function myCallback()
+		obj._isTweening = false
+		if (callback) then callback() end
+	end
+
+	if (not obj.isVisible) then
+		obj.alpha = 0
+		obj.isVisible = true
+	end
+
+	local t = transitionSpeed or 500
+	transition.to( obj,  { time=t, alpha=1, onComplete=myCallback} )
+	obj._isTweening = true
+
+end
+
+
+------------------------------------------------------------------------
+-- Show a message, then fade away
+------------------------------------------------------------------------
+local function tellUser(message, x,y)
+
+	if (not message) then
+		return true
+	end
+
+
+	local screenW, screenH = display.contentWidth, display.contentHeight
+	local viewableScreenW, viewableScreenH = display.viewableContentWidth, display.viewableContentHeight
+	local screenOffsetW, screenOffsetH = display.contentWidth -	 display.viewableContentWidth, display.contentHeight - display.viewableContentHeight
+	local midscreenX = screenW*(0.5)
+	local midscreenY = screenH*(0.5)
+
+	local TimeToShowMessage = 2000
+	local FadeMessageTime = 500
+
+	-- message object
+	local msg = display.newGroup()
+
+	local x = x or 0
+	local y = y or 0
+
+	local w = screenW - 40
+	local h = 0	-- height matches text
+
+	-- msg corner radius
+	local r = 10
+
+	------------------------------------------------------------------------
+	local function closeMessage( event )
+		-- remove from display hierarchy
+		msg.parent:remove( msg )
+		return true
+	end
+
+	------------------------------------------------------------------------
+	local function fadeAwayThenClose()
+		transition.to( msg,	 { time=FadeMessageTime, alpha=0, onComplete=closeMessage} )
+		timedMessage = nil
+		timedMessageList[1] = nil
+		-- remove first element
+		table.remove(timedMessageList, 1)
+		--print ("Messages:", #timedMessageList)
+	end
+
+	------------------------------------------------------------------------
+
+	-- Create empty text box, using default bold font of device (Helvetica on iPhone)
+	-- Screen Width version:
+	local textObject = display.newText( message, 0, 0, w/3,h, native.systemFontBold, 24 )
+
+	-- Fitted width version, does NOT wrap text!
+	--local textObject = display.newText( message, 0, 0, native.systemFontBold, 24 )
+	textObject:setFillColor( 255,255,255 )
+
+	w = textObject.width
+
+	-- A trick to get text to be centered
+	msg.x = midscreenX
+	msg.y = screenH/3
+	msg:insert( textObject, true )
+
+	-- hide initially
+	msg.alpha = 0
+
+	-- Insert rounded rect behind textObject
+	local bkgd = display.newRoundedRect( 0, 0, textObject.contentWidth + 2*r, textObject.contentHeight + 2*r, r )
+	bkgd:setFillColor( 55, 55, 55, 190 )
+	msg:insert( 1, bkgd, true )
+	msg.bkgd = bkgd
+	msg.textObject = textObject
+
+
+	-- Show message
+	msg.textObject.text = message
+	msg.bkgd.width = msg.textObject.width + 2*r
+
+	-- If there is a current message showing, cancel it
+	if (timedMessage) then
+		--timer.cancel(timedMessage)
+	end
+
+
+	msg.y = msg.y + (#timedMessageList - 1) * msg.bkgd.height
+
+
+	--print ("msg:show width = "..msg.textObject.width)
+	transition.to( msg,	 { time=FadeMessageTime, alpha=1} )
+	timedMessage = timer.performWithDelay( TimeToShowMessage, fadeAwayThenClose )
+	timedMessageList[#timedMessageList + 1] = timedMessage
+
 end
 
 
@@ -1671,18 +1845,8 @@ end
 -- starting with filename, e.g. { "filename.jpg", "white", 1000, true}
 -------------------------------------------------
 local function popupWebpage(targetURL, color, bkgdAlpha, transitionTime, netrequired, noNetMsg)
-
-	noNetMsg = noNetMsg or "No Internet"
-
-	if (netrequired and not hasNetConnection() ) then
-		tellUser(noNetMsg)
-		return false
-	end
-
-	local mainImage
-	local pgroup = display.newGroup()
-	anchor(pgroup, "Center")
-	pgroup.x, pgroup.y = midscreenX, midscreenY
+	
+	local testing = false
 	
 	local closing = false
 	if (type(targetURL) == "table") then
@@ -1692,79 +1856,133 @@ local function popupWebpage(targetURL, color, bkgdAlpha, transitionTime, netrequ
 		targetURL = trim(targetURL[1])
 	end
 
-	color = color or "white"
 
-	bkgdAlpha = bkgdAlpha or 0.95
-	transitionTime = transitionTime or 300
+	--------------------------
+	local function doPop(isReachable)
 
-	local function killme()
-		if (pgroup ~= nil) then
-			display.remove(pgroup)
-			pgroup=nil
-			--print "Killed it"
-		else
-			--print ("Tried to kill pGroup, but it was dead.")
-		end
-	end
+--print ("doPop says, isReachable =", isReachable)
 
-	local function closeMe(event)
-		if (not closing and pgroup ~= nil) then
-			native.cancelWebPopup()
-			transition.to (pgroup, {alpha=0, time=transitionTime, onComplete=killme} )
-			closing = true
-		end
-		return true
-	end
+		if (isReachable) then
 
-
-	-- cover all rect, darken background
-	local bkgdrect = display.newRect(0,0,screenW,screenH)
-	pgroup:insert(bkgdrect)
-	anchor(bkgdrect, "Center")
-	bkgdrect:setFillColor( 55, 55, 55, 190 )
-
-	-- background graphic for popup
-	local bkgd = display.newImage("_ui/popup-"..color..".png", true)
-	checkScale(bkgd)
-	pgroup:insert (bkgd)
-	anchor(bkgdrect, "Center")
-	bkgd.alpha = bkgdAlpha
-
-	local closeButton = widget.newButton {
-	    id = "close",
-	    defaultFile = "_ui/button-cancel-round.png",
-	    overFile = "_ui/button-cancel-round-over.png",
-	    onRelease = closeMe,
-	}
-	pgroup:insert(closeButton)
-	anchor(closeButton, "TopRight")
-	anchorZero(closeButton, "Center")
-	closeButton.x = (bkgd.width/2) - closeButton.width/4
-	closeButton.y = -(bkgd.height/2) + closeButton.height/4
-	closeButton:toFront()
+			local mainImage
+			local pgroup = display.newGroup()
+			anchor(pgroup, "Center")
+			pgroup.x, pgroup.y = midscreenX, midscreenY
 	
-	pgroup.alpha = 0
+			color = color or "white"
 
-	-- Capture touch events and do nothing.
-	pgroup:addEventListener( "touch", function() return true end )
+			bkgdAlpha = bkgdAlpha or 0.95
+			transitionTime = transitionTime or 300
 
-	local function showMyWebPopup()
-		-- web popup
-		local x = (screenW - bkgd.width)/2 + (closeButton.width)
-		local y = (screenH - bkgd.height)/2 + (closeButton.height)
-		local w = bkgd.width - (2 * closeButton.width)
-		local h = bkgd.height - (2 * closeButton.width)
+			local function killme()
+				if (pgroup ~= nil) then
+					display.remove(pgroup)
+					pgroup=nil
+					--print "Killed it"
+				else
+					--print ("Tried to kill pGroup, but it was dead.")
+				end
+			end
 
-		--print ("showWebMap: go to ",targetURL)
-		--print (x, y, w, h, targetURL)
-		local options = {
-			hasBackground=true,
-			baseUrl=system.ResourceDirectory,
-		}
-		native.showWebPopup(x, y, w, h, targetURL, options )
+			local function closeMe(event)
+				if (not closing and pgroup ~= nil) then
+					native.cancelWebPopup()
+					transition.to (pgroup, {alpha=0, time=transitionTime, onComplete=killme} )
+					closing = true
+				end
+				return true
+			end
+
+
+			-- cover all rect, darken background
+			local bkgdrect = display.newRect(0,0,screenW,screenH)
+			pgroup:insert(bkgdrect)
+			anchor(bkgdrect, "Center")
+			bkgdrect:setFillColor( 55, 55, 55, 190 )
+
+			-- background graphic for popup
+			local bkgd = display.newImage("_ui/popup-"..color..".png", true)
+			checkScale(bkgd)
+			pgroup:insert (bkgd)
+			anchor(bkgdrect, "Center")
+			bkgd.alpha = bkgdAlpha
+
+			local closeButton = widget.newButton {
+				id = "close",
+				defaultFile = "_ui/button-cancel-round.png",
+				overFile = "_ui/button-cancel-round-over.png",
+				onRelease = closeMe,
+			}
+			pgroup:insert(closeButton)
+			anchor(closeButton, "TopRight")
+			anchorZero(closeButton, "Center")
+			closeButton.x = (bkgd.width/2) - closeButton.width/4
+			closeButton.y = -(bkgd.height/2) + closeButton.height/4
+			closeButton:toFront()
+	
+			pgroup.alpha = 0
+
+			-- Capture touch events and do nothing.
+			pgroup:addEventListener( "touch", function() return true end )
+
+			local function showMyWebPopup()
+						local function listener( event )
+							local shouldLoad = true
+
+--print ("popupWebpage:listener")
+--dumptable(event)
+--print ("========")
+							if event.errorCode then
+								-- Error loading page
+								print( "showMyWebPopup: Error: " .. tostring( event.errorMessage ) )
+								shouldLoad = false
+							end
+
+							return shouldLoad
+						end
+
+
+				-- web popup
+				local x = (screenW - bkgd.width)/2 + (closeButton.width)
+				local y = (screenH - bkgd.height)/2 + (closeButton.height)
+				local w = bkgd.width - (2 * closeButton.width)
+				local h = bkgd.height - (2 * closeButton.width)
+
+				--print ("showWebMap: go to ",targetURL)
+				--print (x, y, w, h, targetURL)
+			
+				local options = {
+					hasBackground=true,
+					urlRequest = listener,
+					-- Only need this for local URLs
+					--baseUrl=system.ResourceDirectory,
+				}
+--print ("popupWebpage:listener")
+--print ("Go to ",targetURL)
+--print ("========")
+
+				native.showWebPopup(x, y, w, h, targetURL, options )
+			end
+			transitionTime = tonumber(transitionTime)
+			transition.to (pgroup, {alpha=1, time=transitionTime, onComplete=showMyWebPopup } )
+
+		else
+			noNetMsg = noNetMsg or "No Internet"
+			tellUser(noNetMsg .. ":" .. targetURL)
+		end
+	end	-- callback function
+	--------------------------
+	
+	-- Do we have network?
+	local testurl = targetURL
+	if (string.sub(testurl, 1, 4) == "http") then
+		testurl = testurl:gsub("^https?://", "")
 	end
-	transitionTime = tonumber(transitionTime)
-	transition.to (pgroup, {alpha=1, time=transitionTime, onComplete=showMyWebPopup } )
+	-- strip subfolders b/c of iOS bug
+	testurl = string.gsub(testurl, "/.*", "")
+
+	canConnectWithServer(testurl, false, doPop, testing)
+		
 end
 
 
@@ -1868,9 +2086,9 @@ local function buildShadow(w,h,sw,opacity)
 	--scale
 
 	corner = sw
-	cornerPad = sw/2
+	local cornerPad = sw/2
 	edge = sw
-	edgePad = sw/2
+	local edgePad = sw/2
 
 	
 	local r = sw / tl.width
@@ -2150,7 +2368,7 @@ local function table_multi_sort(a, sortfields, reverseSort, returnNumericArray)
 			if aa < bb then return true end
 			if aa > bb then return false end
 		end
-		colTitle = sortfields[#sortfields]
+		local colTitle = sortfields[#sortfields]
 		if (reverseSort[#sortfields]) then
 			a,b = b,a
 		end
@@ -2216,7 +2434,7 @@ end
 -- get date parts for a given ISO 8601 date format (http://richard.warburton.it )
 local function get_date_parts(date_str)
 	if (date_str) then
-		_,_,y,m,d=string.find(date_str, "(%d+)-(%d+)-(%d+)")
+		local _,_,y,m,d=string.find(date_str, "(%d+)-(%d+)-(%d+)")
 		return tonumber(y),tonumber(m),tonumber(d)
 	else
 		return nil,nil,nil
@@ -2277,176 +2495,6 @@ local function formatDate(s, f, stripZeros)
 		return ""
 	end
 end
-
-
--------------------------------------------------
--- Shrink the obj away until it is small, then disappear it.
--- Restore its size when done, but leave it hidden
--- Default is shrink to center, but can set destX, destY
-local function shrinkAway (obj, callback, transitionSpeed, destX, destY)
-
-	destX = destX or midscreenX
-	destY = destY or midscreenY
-
-	local xs = obj.yScale
-	local ys = obj.xScale
-	local w = obj.width
-	local h = obj.height
-	local a = obj.alpha
-
-		local function cb()
-			obj.xScale = xs
-			obj.yScale = ys
-			obj.width = w
-			obj.height = h
-			obj.alpha = a
-			obj.isVisible = false
-			callback()
-		end
-
-	callback = callback or nil
-	local t = transitionSpeed or (fadePageTime or 500)
-	anchor(obj, "Center")
-	transition.to( obj,  { time=t, xScale=0.01, yScale=0.01, alpha=0, x=destX, y=destY, onComplete=cb } )
-end
-
-
-
--------------------------------------------------
-local function fadeOut (obj, callback, transitionSpeed)
-	--print ("fadeOut: time="..fadePageTime)
-	callback = callback or nil
-	if (type(callback) ~= "function") then callback = nil end
-
-	local function myCallback()
-		obj._isTweening = false
-		if (callback) then callback() end
-	end
-
-	local t = transitionSpeed or (fadePageTime or 500)
-	transition.to( obj,  { time=t, alpha=0, onComplete=myCallback } )
-	obj._isTweening = true
-end
-
--------------------------------------------------
-local function fadeIn (obj, callback, transitionSpeed)
-	--print ("fadeIn: time="..fadePageTime)
-	callback = callback or nil
-	if (type(callback) ~= "function") then callback = nil end
-
-	local function myCallback()
-		obj._isTweening = false
-		if (callback) then callback() end
-	end
-
-	if (not obj.isVisible) then
-		obj.alpha = 0
-		obj.isVisible = true
-	end
-
-	local t = transitionSpeed or (fadePageTime or 500)
-	transition.to( obj,  { time=t, alpha=1, onComplete=myCallback} )
-	obj._isTweening = true
-
-end
-
-
-------------------------------------------------------------------------
--- Show a message, then fade away
-------------------------------------------------------------------------
-local function tellUser(message, x,y)
-
-	if (not message) then
-		return true
-	end
-
-
-	local screenW, screenH = display.contentWidth, display.contentHeight
-	local viewableScreenW, viewableScreenH = display.viewableContentWidth, display.viewableContentHeight
-	local screenOffsetW, screenOffsetH = display.contentWidth -	 display.viewableContentWidth, display.contentHeight - display.viewableContentHeight
-	local midscreenX = screenW*(0.5)
-	local midscreenY = screenH*(0.5)
-
-	local TimeToShowMessage = 2000
-	local FadeMessageTime = 500
-
-	-- message object
-	local msg = display.newGroup()
-
-	local x = x or 0
-	local y = y or 0
-
-	local w = screenW - 40
-	local h = 0	-- height matches text
-
-	-- msg corner radius
-	local r = 10
-
-	------------------------------------------------------------------------
-	local function closeMessage( event )
-		-- remove from display hierarchy
-		msg.parent:remove( msg )
-		return true
-	end
-
-	------------------------------------------------------------------------
-	local function fadeAwayThenClose()
-		transition.to( msg,	 { time=FadeMessageTime, alpha=0, onComplete=closeMessage} )
-		timedMessage = nil
-		timedMessageList[1] = nil
-		-- remove first element
-		table.remove(timedMessageList, 1)
-		--print ("Messages:", #timedMessageList)
-	end
-
-	------------------------------------------------------------------------
-
-	-- Create empty text box, using default bold font of device (Helvetica on iPhone)
-	-- Screen Width version:
-	local textObject = display.newText( message, 0, 0, w/3,h, native.systemFontBold, 24 )
-
-	-- Fitted width version, does NOT wrap text!
-	--local textObject = display.newText( message, 0, 0, native.systemFontBold, 24 )
-	textObject:setFillColor( 255,255,255 )
-
-	w = textObject.width
-
-	-- A trick to get text to be centered
-	msg.x = midscreenX
-	msg.y = screenH/3
-	msg:insert( textObject, true )
-
-	-- hide initially
-	msg.alpha = 0
-
-	-- Insert rounded rect behind textObject
-	local bkgd = display.newRoundedRect( 0, 0, textObject.contentWidth + 2*r, textObject.contentHeight + 2*r, r )
-	bkgd:setFillColor( 55, 55, 55, 190 )
-	msg:insert( 1, bkgd, true )
-	msg.bkgd = bkgd
-	msg.textObject = textObject
-
-
-	-- Show message
-	msg.textObject.text = message
-	msg.bkgd.width = msg.textObject.width + 2*r
-
-	-- If there is a current message showing, cancel it
-	if (timedMessage) then
-		--timer.cancel(timedMessage)
-	end
-
-
-	msg.y = msg.y + (#timedMessageList - 1) * msg.bkgd.height
-
-
-	--print ("msg:show width = "..msg.textObject.width)
-	transition.to( msg,	 { time=FadeMessageTime, alpha=1} )
-	timedMessage = timer.performWithDelay( TimeToShowMessage, fadeAwayThenClose )
-	timedMessageList[#timedMessageList + 1] = timedMessage
-
-end
-
 
 
 
@@ -2544,7 +2592,6 @@ end
 
 local function hideSpinner()
 		rr:removeSelf()
-		oogabooga.r = nil
 end
 
 
@@ -2605,7 +2652,7 @@ end
 ------------------------------------------------------------------------
 
 local function unloadModule ( moduleName )
-	fxTime = fxTime or 200
+	local fxTime = 200
 	if type(package.loaded[moduleName]) == "table" then
 		package.loaded[moduleName] = nil
 		local function garbage ( event )
@@ -2794,7 +2841,7 @@ end
 
 -- returns true/false depending whether value is a percent
 local function isPercent (x)
-	v,s = string.match(x, "(%d+)(%%)$")
+	local v,s = string.match(x, "(%d+)(%%)$")
 	if (s == "%") then
 		return true
 	else
@@ -2805,7 +2852,7 @@ end
 
 -- Return x%, e.g. 10% returns .10
 local function percent (x)
-	v = string.match(x, "(%d+)%%$")
+	local v = string.match(x, "(%d+)%%$")
 	if v then
 		v = v / 100
 	end
@@ -3019,7 +3066,8 @@ local function lines(str)
 	return t
 end
 
-local function loadFile(filename)
+-- Load a file into a variable
+local function readFile(filename)
 	local filePath = system.pathForFile( filename, system.ResourceDirectory )
 
 	local hFile,err = io.open(filePath,"r");
@@ -3063,7 +3111,7 @@ local function buildTextDisplayObjectsFromTemplate (template, obj)
 		o.alpha = 1.0
 		objs[name] = o
 		--print ("Params for "..name..":")
-		dump(params)
+		dumptable(params)
 
 	end
 	return objs
@@ -3183,7 +3231,7 @@ end
 local function showTestLine (g,x,y,t,leading)
 	y = math.floor(y)
 	leading = leading or 0
-	len = len or 100
+	local len = 100
 	local b = display.newLine(g, x, y, x+len, y)
 	b:setStrokeColor(0,0,100,0.9)
 	local t = display.newText(g, "y="..y..":"..", "..leading..": "..t,x,y,"Georgia-Italic",9)
@@ -3296,6 +3344,8 @@ end
 
 local function referenceAdjustedXY (obj, x, y, newReferencePoint, scale, shadowOffset)
 	local stringFind = string.find
+	
+	local rx, ry, rp, offsetX, offsetY
 
 	rx = obj.xReference
 	ry = obj.yReference
@@ -3389,6 +3439,7 @@ local function positionObject(x,y,w,h,margins)
 
 	margins = margins or {top=0, bottom=0,left=0,right=0}
 
+	local xpos, ypos
 	-- Horizontal offsets
 	if (x == "left") then
 		xpos = w/-2 + margins.left
@@ -3459,6 +3510,7 @@ local function positionObjectAroundCenter(x,y,w,h,margins)
 	margins = margins or {top=0, bottom=0,left=0,right=0}
 
 	-- Horizontal offsets
+	local xpos, ypos
 	if (x == "left") then
 		xpos = w/-2 + margins.left
 	elseif (x == "right") then
@@ -3686,7 +3738,7 @@ end
 -- TESTING TOOLS:
 -- Print local vs. stage coordinates by touching an object.
 local function showContentToLocal(obj, state)
-	function showCoordinates( event )
+	local function showCoordinates( event )
 	--		Get x, y of touch event in content coordinates
 			local contentx, contenty = event.x, event.y
 	--		Convert to local coordinates of
@@ -3794,7 +3846,7 @@ local function mkdir (dirname, prefix, unique, systemdir)
 	end
 
 	-- Use a unique-ish file name if necessary
-	mydirname = dirname or os.time() .. "_" ..os.clock()
+	local mydirname = dirname or os.time() .. "_" ..os.clock()
 
 	local temp_path = system.pathForFile( mydirname, systemdir )
 	if (unique) then
@@ -4100,7 +4152,7 @@ local function copyDir (src, srcBaseDir, target, targetBaseDir, newname)
 	local tbase = system.pathForFile( nil, targetBaseDir )
 	local targetPath = tbase .. "/" .. target .. "/"
 
-print ("copyDir:",sbase, targetPath)
+--print ("copyDir:",sbase, targetPath)
 
 	local res, err = lfs.chdir(targetPath)
 	if (not res) then
@@ -4121,6 +4173,7 @@ print ("copyDir:",sbase, targetPath)
 	local allowDotFiles = false
 
 	if (res) then
+		local filename
 		for filename in lfs.dir(srcPath) do
 			local res = lfs.chdir (srcPath)
 			if (res and allowDotFiles or string.sub(filename, 1, 1) ~= ".") then
@@ -4144,7 +4197,7 @@ end
 -------------------------------------------------
 -- Delete a directory even if not empty
 -- If keepDir is true, then only delete the contents
-local function rmDir(dir, path, keepDir)
+local function rmDir(dir,path, keepDir)
 	path = path or system.DocumentsDirectory
 
 	local doc_path = system.pathForFile( dir, path )
@@ -4631,22 +4684,22 @@ FUNX.AddCommas = AddCommas
 FUNX.addPosRect = addPosRect
 FUNX.adjustXYforShadow  = adjustXYforShadow 
 
-FUNX.anchorBottomLeftZero = anchorBottomLeftZero
-FUNX.anchorBottomLeft = anchorBottomLeft
-FUNX.anchorBottomRightZero = anchorBottomRightZero
-FUNX.anchorBottomRight = anchorBottomRight
-FUNX.anchorBottomCenterZero = anchorBottomCenterZero
-FUNX.anchorBottomCenter = anchorBottomCenter
-
-FUNX.anchorCenter = anchorCenter
-FUNX.anchorCenterZero = anchorCenterZero
-
-FUNX.anchorTopCenter = anchorTopCenter
-FUNX.anchorTopCenterZero = anchorTopCenterZero
-FUNX.anchorTopLeft = anchorTopLeft
-FUNX.anchorTopLeftZero = anchorTopLeftZero
-FUNX.anchorTopRight = anchorTopRight
-FUNX.anchorTopRightZero = anchorTopRightZero
+--FUNX.anchorBottomLeftZero = anchorBottomLeftZero
+--FUNX.anchorBottomLeft = anchorBottomLeft
+--FUNX.anchorBottomRightZero = anchorBottomRightZero
+--FUNX.anchorBottomRight = anchorBottomRight
+--FUNX.anchorBottomCenterZero = anchorBottomCenterZero
+--FUNX.anchorBottomCenter = anchorBottomCenter
+--
+--FUNX.anchorCenter = anchorCenter
+--FUNX.anchorCenterZero = anchorCenterZero
+--
+--FUNX.anchorTopCenter = anchorTopCenter
+--FUNX.anchorTopCenterZero = anchorTopCenterZero
+--FUNX.anchorTopLeft = anchorTopLeft
+--FUNX.anchorTopLeftZero = anchorTopLeftZero
+--FUNX.anchorTopRight = anchorTopRight
+--FUNX.anchorTopRightZero = anchorTopRightZero
 
 FUNX.anchor = anchor
 FUNX.anchorZero = anchorZero
@@ -4658,7 +4711,7 @@ FUNX.autoWrappedText  = autoWrappedText
 FUNX.basename  = basename 
 FUNX.buildPictureCorners  = buildPictureCorners 
 FUNX.buildShadow = buildShadow
-FUNX.buildShadow1 = buildShadow1
+FUNX.buildShadow1 = buildShadowNew
 FUNX.buildTextDisplayObjectsFromTemplate  = buildTextDisplayObjectsFromTemplate 
 FUNX.callClean  = callClean 
 FUNX.canConnectWithServer = canConnectWithServer
@@ -4676,7 +4729,7 @@ FUNX.deleteDirectoryContents = deleteDirectoryContents
 FUNX.dimScreen = dimScreen
 FUNX.dirname = dirname
 FUNX.newArc = newArc
-FUNX.dump = dump
+FUNX.dump = dumptable
 FUNX.escape = escape
 FUNX.fadeIn  = fadeIn 
 FUNX.fadeOut  = fadeOut 
@@ -4699,7 +4752,7 @@ FUNX.getmonth = getmonth
 FUNX.getRandomSet = getRandomSet
 FUNX.getScaledFilename = getScaledFilename
 FUNX.getStatusBarHeight = getStatusBarHeight
-FUNX.getTextStyles  = getTextStyles 
+--FUNX.getTextStyles  = getTextStyles 
 FUNX.getValue = getValue
 FUNX.getXHeightAdjustment  = getXHeightAdjustment 
 FUNX.hasFieldCodes = hasFieldCodes
@@ -4717,7 +4770,7 @@ FUNX.keysExistInTable = keysExistInTable
 FUNX.lazyLoad = lazyLoad
 FUNX.lines = lines
 FUNX.loadData = loadData
-FUNX.loadFile = loadFile
+FUNX.readFile = readFile
 FUNX.loadImageFile = loadImageFile
 FUNX.loadTable = loadTable
 FUNX.loadTableFromFile = loadTableFromFile
@@ -4764,7 +4817,7 @@ FUNX.scaleObjectToMargins  = scaleObjectToMargins
 FUNX.ScaleObjToSize  = ScaleObjToSize 
 FUNX.setCase = setCase
 FUNX.setFillColorFromString = setFillColorFromString
-FUNX.setTextStyles  = setTextStyles 
+--FUNX.setTextStyles  = setTextStyles 
 FUNX.showContentToLocal = showContentToLocal
 FUNX.showSpinner = showSpinner
 FUNX.showTestBox  = showTestBox 

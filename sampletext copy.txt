@@ -41,14 +41,17 @@ Bunny looked at him and said</p>
 
 
 
-
+<p class="Left">One of the most distinguishing features of this species is the bold dark-bars draped across the dorsal surface. Additional dark spots are found along the lateral surfaces of the species. In adult specimens, the pectoral fins are broadly triangular.</p>
+<br>
+<br>
 <p class="Left" >
-	<span>David Gross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span>Ooga booga boo.
+	<i><span>Center McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span></i> are great people who love to eat super-duper-wooper all day.
 </p>
+<br/><br/>
 <p class="Right" >
-	<span>Righty McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span><a href="cowdung">Ooga booga boo.</a>
+	<i><span>Center McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span></i> are great people who love to eat super-duper-wooper all day.
 </p>
-
-<p class="Center" >
-	<span>Center McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span> are great people who love to eat super-duper-wooper all day.
+<br/><br/>
+<p class="Left" >
+	<p style="text-align:center;">Omnivores <br/>eat animals & plants & algae, and <br> <i><span>Center<br/>McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span></i> are great people<br>who love to eat super-duper-wooper all day.</p>
 </p>

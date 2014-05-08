@@ -50,7 +50,7 @@ local w = screenW/2 - 50
 
 local textStyles = funx.loadTextStyles("textstyles.txt", system.ResourceDirectory)
 
-local mytext = funx.loadFile("sampletext.txt")
+local mytext = funx.readFile("sampletext.txt")
 
 -- To cache, set the cache directory
 local cacheDir = ""
@@ -93,6 +93,7 @@ local params = {
 	defaultStyle = "Normal",
 	cacheDir = cacheDir,
 	isHTML = true,
+	useHTMLSpacing = true,
 }
 
 ------------
@@ -207,7 +208,7 @@ local function go()
 	t2.y = 100 + t.yAdjustment
 
 
-	yAdjustment = t.yAdjustment
+	local yAdjustment = t.yAdjustment
 
 	-- Frame the text
 	textframe = display.newRect(0,0, w+2, t.height + 2)

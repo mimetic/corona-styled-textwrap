@@ -558,6 +558,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	settings.minWordLen = 2
 
 	settings.isHTML = false
+	settings.useHTMLSpacing = false
 
 	-- handler for links
 	settings.handler = {}
@@ -586,13 +587,15 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 		settings.minWordLen = text.minWordLen
 		textstyles = text.textstyles or textstyles
 		settings.isHTML = text.isHTML or false
+		settings.useHTMLSpacing = text.useHTMLSpacing or false
+		
 		defaultStyle = text.defaultStyle or ""
 		cacheDir = text.cacheDir
 		settings.handler = text.handler
 		hyperlinkFillColor = text.hyperlinkFillColor or "0,0,255,"..TRANSPARENT
 		
 		testing = testing or text.testing
-		
+				
 		-- restore text
 		text = text.text
 	end
@@ -665,8 +668,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	InDesign also uses &#8221; instead of double-quote marks when exporting quotes in XML. WTF?
 
 	]]
-
-
+	
 	-- This is &#8221;
 	--local doubleRtQuote
 
@@ -682,24 +684,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	text = entities.unescape(text)
 
 
-
-	--[[
-	-- NOT IN USE: THIS IS BEFORE WE PARSED INDESIGN INTO HTML
-
-	-- For text fields, NOT HTML fields, add CR after every line that comes from InDesign.
-	-- InDesign uses the above separators, which suck.
-	-- Note the spaces after the returns! This prevents the return from being stripped as
-	-- simply extra blank space!
-
-	-- We check later WHICH line end we use, and format appropriately
-	if (not settings.isHTML) then
-		text = text:gsub(funx.unescape(lineSeparatorCode),"\r ")
-		text = text:gsub(funx.unescape(paragraphSeparatorCode),"\n ")
-
-	end
-	--]]
 	--- THEN, TOO, THERE'S MY OWN FLAVOR OF LINE BREAK!
-	-- Replace our special line break code with a return!
+	-- Replace our special line break code one could use in the source text with an HTML return!
 	text = text:gsub("%[%[%[br%]%]%]","<br>")
 
 	------------------------
@@ -1103,14 +1089,20 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local oneLinePattern = "[^\n^\r]+"
 	local oneLinePattern = ".-[\n\r]"
 
-	-- NO: In fact, we should make HTML into one big block
-	-- Split the text into paragraphs using <p>
-	--text = breakTextIntoParagraphs(text)
-	local t1 = text
 	if (settings.isHTML) then
 		--print ("Autowrap: line 500 : text is HTML!")
-		text = trim(text:gsub("[\n\r]",""))
+		text = trim(text:gsub("[\n\r]+"," "))
 	end
+
+	-- ----------------------
+	-- Use HTML Spacing
+	-- Replace all multiple-spaces, returns and tabs with single spaces, just like HTML
+	-- ----------------------
+	if (settings.useHTMLSpacing) then
+		text = text:gsub("[\t ]+"," ")
+		text = text:gsub(" +"," ")
+	end
+
 
 	-- Be sure the text block ends with a return, so the line chopper below finds the last line!
 	if (substring(text,1,-1) ~= "\n") then
@@ -1256,6 +1248,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				settings.width = settings.width or 300
 
 				-- Set text alignment
+				--[[
 				local textDisplayReferencePoint
 				if (textAlignment and textAlignment ~= "") then
 					textAlignment = fixCapsForReferencePoint(textAlignment)
@@ -1263,6 +1256,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 					textAlignment = "Left"
 				end
 				textDisplayReferencePoint = display["Bottom"..textAlignment.."ReferencePoint"]
+				--]]
 				
 				-- Everything is left aligned, the alignment happens after a whole line is built.
 				--textAlignment = "Left"
@@ -1402,21 +1396,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 					renderedLinesStats[currentRenderedLineIndex].textAlignment = textAlignment
 					renderedLinesStats[currentRenderedLineIndex].currentWidth = settings.currentWidth
 					renderedLinesStats[currentRenderedLineIndex].width = settings.width
-					
-					if (false and testing) then
-						local q = display.newText{
-										parent = obj,
-										text = "#"..currentRenderedLineIndex, 
-										x = obj.width/2, y = -obj.height/2,
-										fontSize = 10,
-										align = "left",
-									}
-						q:setFillColor(250,0,0)
-						anchor(q, "center")
-					end
-									
-					
-					
+
 				end
 				
 				
@@ -1453,9 +1433,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 							local wordlen = 0
 							
 							local isFirstLineInElement = true
-							
-							local cows = {}
-							
+														
 							-- =======================================================
 							-- FUNCTIONS
 							-- =======================================================
@@ -1471,9 +1449,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 									testBkgdColor = testBkgdColor or {250,250,100,30}
 
 									-- when drawing the box, we compensate for the stroke, thus -2
-									local r = display.newRect(0, 0, newDisplayLineText.width-2, newDisplayLineText.height-2)
+									local r = display.newRect(newDisplayLineGroup, 0, 0, newDisplayLineText.width-2, newDisplayLineText.height-2)
 									r.strokeWidth=1
-									newDisplayLineGroup:insert(r)
 									anchor(r, "BottomLeft")
 									r.x = newDisplayLineText.x+1
 									r.y = newDisplayLineText.y+1
@@ -1673,6 +1650,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 										end
 
 										tempLine = currentLine..shortword..word..spacer
+
 									else
 										spacer = ""
 										tempLine = word
@@ -1950,6 +1928,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 
 
 													if (textwrapIsCached or (not longword and wordlen <= settings.currentWidth * widthCorrection) ) then
+
 														if (textwrapIsCached) then
 															currentLine = word
 														else
@@ -2207,6 +2186,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 										fontSize = settings.size,
 										align = "left",
 									})
+
 									newDisplayLineText:setFillColor(unpack(settings.color))
 									anchorZero(newDisplayLineText, "BottomLeft")
 
@@ -2249,9 +2229,10 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 													currentRenderedLineIndex = currentRenderedLineIndex,
 												})
 									end
-								
-									settings.currentXOffset = settings.currentXOffset + newDisplayLineText.width
 
+									-- Corona is adding extra width, I think, so we remove 1.5 pixel around!!!
+									settings.currentXOffset = settings.currentXOffset + newDisplayLineText.width - 3
+									
 									cachedChunkIndex = cachedChunkIndex + 1
 
 
@@ -2455,6 +2436,13 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 						-- Reset the first line of paragraph flag
 						isFirstLine = true
 						elementCounter = 1
+					elseif (tag == "br") then
+						currentRenderedLineIndex = currentRenderedLineIndex + 1
+						setStyleFromTag (tag, attr)
+						renderTextFromMargin = true
+						settings.currentXOffset = 0
+						isFirstLine = true
+						--elementCounter = 1
 					elseif (tag == "li") then
 						setStyleFromTag (tag, attr)
 						currentRenderedLineIndex = currentRenderedLineIndex + 1
@@ -2483,15 +2471,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 						-- Reset the first line of paragraph flag
 						isFirstLine = true
 						elementCounter = 1
-					elseif (tag == "br") then
-						currentRenderedLineIndex = currentRenderedLineIndex + 1
-						renderTextFromMargin = true
-						settings.currentXOffset = 0
-						setStyleFromTag (tag, attr)
-						lineY = lineY + currentLineHeight
-						-- Reset the first line of paragraph flag
-						isFirstLine = true
-						--elementCounter = 1
 					elseif (tag == "#document") then
 						-- lines from non-HTML text will be tagged #document
 						-- and this will handle them.
