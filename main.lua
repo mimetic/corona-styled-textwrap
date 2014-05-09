@@ -53,11 +53,9 @@ local textStyles = funx.loadTextStyles("textstyles.txt", system.ResourceDirector
 local mytext = funx.readFile("sampletext.txt")
 
 -- To cache, set the cache directory
-local cacheDir = ""
-if (true) then
-	funx.mkdir ("textrender_cache", "",false, system.CachesDirectory)
-	cacheDir = "textrender_cache"
-end
+local cacheDir = "textrender_cache"
+funx.mkdir (cacheDir, "",false, system.CachesDirectory)
+
 
 
 
@@ -68,8 +66,6 @@ local reps = 50
 
 ------------------------------------------------------------
 ------------------------------------------------------------
-
-
 
 
 -- To prevent caching, set the cache dir to empty
@@ -91,7 +87,8 @@ local params = {
 	minWordLen = 2,
 	textstyles = textStyles,
 	defaultStyle = "Normal",
-	cacheDir = cacheDir,
+	cacheDir = "",
+	cacheToDB = true,
 	isHTML = true,
 	useHTMLSpacing = true,
 }
@@ -166,9 +163,17 @@ local function go()
 
 	if (reps > 10) then 
 		params.cacheDir = ""
+		params.cacheToDB = false
+		params.text = mytext
+		
+		-- RENDER WITHOUT CACHING
 		local tdiffNoCache = drawAndDelete(params,reps)
 
-		params.cacheDir = cacheDir
+		params.cacheDir = ""
+		params.cacheToDB = true
+		params.text = mytext
+		
+		-- RENDER USING THE CACHE
 		local tdiffCached = drawAndDelete(params, reps)
 
 		------------
@@ -193,8 +198,12 @@ local function go()
 	end
 
 
+
+	-- PRINT THE RESULTS
+	
 	params.text = mytext .. tmsg
-	params.cacheDir = cacheDir
+	params.cacheDir = nil
+	params.cacheToDB = true
 
 	t = textwrap.autoWrappedText(params)
 	t.x = 20
@@ -202,14 +211,28 @@ local function go()
 
 	params.testing = false
 
-	params.cacheDir = cacheDir
+	params.cacheDir = ""
+	params.cacheToDB = true
 	t2 = textwrap.autoWrappedText(params)
 	t2.x = w + 50
 	t2.y = 100 + t.yAdjustment
 
 
 	local yAdjustment = t.yAdjustment
-
+	
+	-- Labels
+	local label1 = display.newText("This Text is from XML", 0, 0, nil, 18)
+	label1:setReferencePoint(display.BottomLeftReferencePoint)
+	label1.x = 20
+	label1.y = 90
+	label1:setFillColor(100,100,0) -- transparent
+	
+	local label2 = display.newText("This Text is from the Cache", 0, 0, nil, 18)
+	label2:setReferencePoint(display.BottomLeftReferencePoint)
+	label2.x = t2.x
+	label2.y = 90
+	label2:setFillColor(100,100,0) -- transparent
+	
 	-- Frame the text
 	textframe = display.newRect(0,0, w+2, t.height + 2)
 	textframe:setFillColor(100,100,0,20) -- transparent
@@ -235,6 +258,14 @@ local function go()
 	
 	gobutton.isVisible = true
 
+end
+
+
+
+
+if textwrap.db and textwrap.db:isopen() then
+	textwrap.db:close()
+	print ("MAIN TESTING: Close DB")
 end
 
 

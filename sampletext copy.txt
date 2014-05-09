@@ -55,3 +55,13 @@ Bunny looked at him and said</p>
 <p class="Left" >
 	<p style="text-align:center;">Omnivores <br/>eat animals & plants & algae, and <br> <i><span>Center<br/>McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span></i> are great people<br>who love to eat super-duper-wooper all day.</p>
 </p>
+
+
+<p class="Left" style="text-align:center;">
+	cows are nice to me. Omnivores <br />eat animals & plants & algae, and <br /> 
+	<i>
+		<span>Center<br />
+		McGross</span><span style="color:rgb(170,70,70);">sss</span>
+	</i>
+	are great people<br /> who love to eat super-duper-wooper all day. Fish are also wonderful things taht we can all love. 
+</p>

@@ -4538,6 +4538,7 @@ local function checksum(str)
       end
    end
    --]]
+   print (temp,str)
 	return temp
 end
 

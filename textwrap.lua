@@ -53,6 +53,12 @@ local funx = require ("funx")
 local html = require ("html")
 local entities = require ("entities")
 
+local sqlite3 = require "sqlite3"
+local json = require("json")
+local crypto = require "crypto"
+
+
+
 -- functions
 local max = math.max
 local min = math.min
@@ -309,34 +315,114 @@ end
 
 --------------------------------------------------------
 -- CACHE of textwrap!!!
+-- The closing of the database is done when the app quits.
 --------------------------------------------------------
-local function saveTextWrapToCache(id, cache, baselineCache, cacheDir)
-	if (cacheDir and cacheDir ~= "") then
-		funx.mkdirTree (cacheDir .. "/" .. textWrapCacheDir, system.CachesDirectory)
-		--funx.mkdir (cacheDir .. "/" .. textWrapCacheDir, "",false, system.CachesDirectory)
-		-- Developing: delete the cache
+--- Fix single quotes for SQLite
+-- Single quotes become double single-quotes, ' -> ''
+local function fixQuotes(s)
+	--s = string.gsub(s, "'", "''")
+	s = s or ""
+	s = string.gsub(s, [[']], [['']])
+	return s
+end
+
+--- Implent the db:first_row command
+-- @param db The database handle
+-- @param cmd A text SQL command, e.g. "SELECT * FROM books"
+local function first_row(db, cmd)
+	local row = false
+	for a in db:nrows(cmd) do
+		return a
+	end
+	return row
+end
+
+
+local function openCacheDB()
+	-- Create the new DB
+--print ("not T.db or not T.db:isopen()", not T.db or not T.db:isopen())
+	if ( not T.db or not T.db:isopen() ) then
+		local path = system.pathForFile( "textcache.db", system.CachesDirectory )
+		local db = sqlite3.open( path )
+		-- Be sure the table exists		
+		local cmd = "CREATE TABLE IF NOT EXISTS caches (id TEXT PRIMARY KEY, cache TEXT, baseline TEXT );"
+		db:exec( cmd )
 		
-		-- Add in the baseline cache
-		local c = { wrapCache = cache, baselineCache = baselineCache }
-		if (true) then
-			local fn =  cacheDir .. "/" .. textWrapCacheDir .. "/" ..  id .. ".json"
-			funx.saveTable(c, fn , system.CachesDirectory)
+		-- save in the module table
+		T.db = db
+		--print ("openCacheDB: Opened")
+	end
+	--T.cacheToDB = true
+end
+
+-- Install a closing function for the caching database into the applicationExit
+local function closeDB( event )
+	if event.type == "applicationExit" then
+		if T.db and T.db:isopen() then
+			T.db:close()
+			print ("closeDB: Close")
+		end
+	end
+end
+
+
+
+local function saveTextWrapToCache(id, cache, baselineCache, cacheDir)
+--print ("saveTextWrapToCache: ID", id)
+	if (T.cacheToDB) then
+		if ( not T.db or not T.db:isopen() ) then
+			openCacheDB()
+		end
+
+		local cmd = "INSERT INTO 'caches' (id,cache,baseline) VALUES ('" ..id .. "','" .. fixQuotes(json.encode(cache)) .. "','" .. fixQuotes(json.encode(baselineCache)) .. "');"
+		T.db:exec( cmd )
+
+	else
+		if (cacheDir and cacheDir ~= "") then
+			funx.mkdirTree (cacheDir .. "/" .. textWrapCacheDir, system.CachesDirectory)
+			--funx.mkdir (cacheDir .. "/" .. textWrapCacheDir, "",false, system.CachesDirectory)
+			-- Developing: delete the cache
+		
+			-- Add in the baseline cache
+			local c = { wrapCache = cache, baselineCache = baselineCache, }
+			if (true) then
+				local fn =  cacheDir .. "/" .. textWrapCacheDir .. "/" ..  id .. ".json"
+				funx.saveTable(c, fn , system.CachesDirectory)
+			end
 		end
 	end
 end
 
 --------------------------------------------------------
 local function loadTextWrapFromCache(id, cacheDir)
-	if (cacheDir) then
-		local fn = cacheDir .. "/" .. textWrapCacheDir .. "/" ..  id .. ".json"
-
-		if (funx.fileExists(fn, system.CachesDirectory)) then
-			local c = funx.loadTable(fn, system.CachesDirectory)
---print ("cacheTemplatizedPage: found page "..fn )
-			return c
+	if (T.cacheToDB) then
+		if ( not T.db or not T.db:isopen() ) then
+			openCacheDB()
 		end
+
+--print ("loadTextWrapFromCache: ID",id)
+
+		local cmd = "SELECT * FROM caches WHERE id='" .. id .. "';"
+		local row = first_row(T.db, cmd)
+		if (row ) then
+			local c = { wrapCache = json.decode(row.cache), baselineCache = json.decode(row.baseline), }
+			return c
+		else
+--print ("NOT CACHED: ID",id)
+			return false
+		end
+	else
+		if (cacheDir) then
+			local fn = cacheDir .. "/" .. textWrapCacheDir .. "/" ..  id .. ".json"
+
+			if (funx.fileExists(fn, system.CachesDirectory)) then
+				local c = funx.loadTable(fn, system.CachesDirectory)
+	--print ("cacheTemplatizedPage: found page "..fn )
+				return c
+			end
+		end
+		return false
 	end
-	return false
 end
 
 
@@ -389,6 +475,10 @@ local function clearAllCaches(cacheDir)
 	if (cacheDir and cacheDir ~= "") then
 		funx.rmDir (cacheDir .. "/" .. textWrapCacheDir, system.CachesDirectory, true) -- keep structure, delete contents
 	end
+	
+	-- Remove DB file
+	local path = system.pathForFile( "textcache.db", system.CachesDirectory )
+	local results, reason = os.remove( path )
 end
 
 
@@ -570,6 +660,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local textstyles = textstyles or {}
 
 	local hyperlinkFillColor
+	
+	T.cacheToDB = true
 
 	-- If table passed, then extract values
 	if (type(text) == "table") then
@@ -595,6 +687,11 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 		hyperlinkFillColor = text.hyperlinkFillColor or "0,0,255,"..TRANSPARENT
 		
 		testing = testing or text.testing
+		
+		-- Default is true, allow set to false here
+		if (text.cacheToDB ~= nil) then
+			T.cacheToDB = text.cacheToDB
+		end
 				
 		-- restore text
 		text = text.text
@@ -607,15 +704,20 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local textwrapIsCached = false
 	local cache = { { text = "", width = "", } }
 	local cacheIndex = 1
-	
+		
 	-- Cache of font baselines for different sizes, as drawing on screen
 	local baselineCache = {}
 	
 	-- Interpret the width so we can get it right caching:
 	width = funx.percentOfScreenWidth(width) or display.contentWidth
-
-	if ( cacheDir and cacheDir ~= "" ) then
-		textUID = "cache"..funx.checksum(text).."_"..tostring(width)
+	
+	-- Default is to cache using the sqlite3 database.
+	-- If cacheToDB is FALSE, then we fall back on the text file cacheing
+	-- if cacheDir is set.
+	if ( T.cacheToDB or (cacheDir and cacheDir ~= "") ) then
+		--textUID = "cache"..funx.checksum(text).."_"..tostring(width)
+		textUID = crypto.digest( crypto.md4, tostring(width) .. text )
+--print ( tostring(width) .. text )
 		local c = loadTextWrapFromCache(textUID, cacheDir)
 		if (c) then
 			textwrapIsCached = true
@@ -1573,7 +1675,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 									print ("********** Rendering from cache.")
 								end
 
-
 								for cachedChunkIndex, text in pairs(cachedChunk.text) do
 
 									local cachedItem = getCachedChunkItem(cachedChunk, cachedChunkIndex)
@@ -2517,8 +2618,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			local oneXMLBlock = renderXML(restOLine)
 			result:insert(oneXMLBlock)
 			oneXMLBlock.anchorX, oneXMLBlock.anchorY = 0, 0
-
 		end -- html elements for one paragraph
+
 
 	end
 
@@ -2531,12 +2632,36 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	result.anchorChildren = true
 	result.anchorX, result.anchorY = 0,0
 	
-	saveTextWrapToCache(textUID, cache, baselineCache, cacheDir)
+	
+	-- Cache the render if it wasn't cached already.
+	if ( not textwrapIsCached and (T.cacheToDB or (cacheDir and cacheDir ~= ""))) then
+		--print ("NOT CACHED, WRITE")
+		saveTextWrapToCache(textUID, cache, baselineCache, cacheDir)
+	end
+
+
+
+--	if T.db and T.db:isopen() then
+--		T.db:close()
+--		print ("TESTING: Close DB")
+--	end
 
 	return result
 end
 
 T.autoWrappedText = autoWrappedText
 T.clearAllCaches = clearAllCaches
+
+-- OPEN CACHE DATABASE
+openCacheDB()
+
+if (not T.addedCloseDatabaseFunction) then
+	Runtime:addEventListener( "system", closeDB )
+	T.addedCloseDatabaseFunction = true
+	--print ("textwrap: Added closing function!")
+end
+
+
+
 
 return T
