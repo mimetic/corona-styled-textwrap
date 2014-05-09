@@ -12,24 +12,27 @@ However, for everything else, it is fantastic. I use it for my ebook app, and it
 <pre>
 local params = {
   text = mytext,
+  	-- default text settings (overriden by styles)
 	font = "AvenirNext-Regular",
 	size = "12",
 	lineHeight = "16",
 	color = {0, 0, 0, 255},
-	width = w,
-	alignment = "Left",
 	opacity = "100%",
+	width = w, -- width of the column of text
+	alignment = "Left", -- default text alignment, note the initial capital letter
 	minCharCount = 5,	-- 	Minimum number of characters per line. Start low.
 	targetDeviceScreenSize = screenW..","..screenH,	-- Target screen size, may be different from current screen size
 	letterspacing = 0,
 	maxHeight = screenH - 50,
-	minWordLen = 2,
-	textstyles = textStyles,
-	defaultStyle = "Normal",
-	cacheDir = cacheDir,
+	minWordLen = 2, - Minimum length of a word shown at the end of a line, e.g. don't end lines with "a".
+	textstyles = textStyles, -- styles table, loaded using funx.loadTextStyles
+	defaultStyle = "Normal", -- default style (from textstyles.txt) for text
+	cacheDir = cacheDir, -- Set to cache directory name to use json file caching (slow)
+	cacheToDB = true, -- default is true, set to false for no caching, uses sqlite3 caching (faster)
 	handler = handler,  -- a function that will accept a 'tap' event
 	hyperlinkFillColor = hyperlinkFillColor, -- an RGBa color in a string, like this: "200,120,255,100"
-
+	isHTML = true, -- TRUE if the text is simplified HTML styled text
+	useHTMLSpacing = true, -- if TRUE, then change all returns and tabs and double-spaces to a single space
 }
 local t = textwrap.autoWrappedText(params)
 </pre>
