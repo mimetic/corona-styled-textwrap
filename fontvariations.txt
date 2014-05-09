@@ -40,8 +40,8 @@ ArialHebrew-Bold = ArialHebrew-Bold
 #Arial Rounded MT Bold
 #ArialRoundedMTBold = ArialRoundedMTBold
 
-#ASafePlacetoFall
-ASafePlacetoFall-Italic = TalkingtotheMoon
+#ASafePlacetoFall-Italic = TalkingtotheMoon
+ASafePlacetoFall-Italic = ASafePlacetoFall
 
 
 #Avenir
