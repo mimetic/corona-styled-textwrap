@@ -1,13 +1,9 @@
 corona-styled-textwrap
 ======================
 
-A pure-Lua text rendering module for Corona SDK which can handle basic HTML, fonts, and even basic font metrics.
+A pure-Lua text rendering module for Corona SDK which can handle basic HTML, fonts, font-styles, and even basic font metrics.
 
-I've made this library public in the hopes that we can fix the bugs and improve it. The documentation is poor, I know...feel free to help, or ask me questions!!!
-
-It has a major flaw right now -- it cannot render styled text that is right/center justified. So sad. Hard to fix.
-
-However, for everything else, it is fantastic. I use it for my ebook app, and it is fast and flexible.
+I've made this library public in the hopes that we can fix the bugs and improve it. The documentation could be better, I know. Ask, and I will reply.
 
 <pre>
 local params = {
