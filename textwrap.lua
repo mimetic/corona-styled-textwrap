@@ -43,6 +43,8 @@
 
 -- TESTING
 local testing = false
+-- Don't use the line-wrap cache
+local noCache = false
 
 
 -- Main var for this module
@@ -63,6 +65,7 @@ local crypto = require "crypto"
 local max = math.max
 local min = math.min
 local lower = string.lower
+local upper = string.upper
 local gmatch = string.gmatch
 local gsub = string.gsub
 local strlen = string.len
@@ -711,6 +714,12 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	-- Interpret the width so we can get it right caching:
 	width = funx.percentOfScreenWidth(width) or display.contentWidth
 	
+	-- TESTING
+	if (noCache) then
+		cacheDir = nil
+		T.cacheToDB = false
+	end
+		
 	-- Default is to cache using the sqlite3 database.
 	-- If cacheToDB is FALSE, then we fall back on the text file cacheing
 	-- if cacheDir is set.
@@ -805,7 +814,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 --	width = funx.percentOfScreenWidth(width) or display.contentWidth
 --	opacity = funx.applyPercent(opacity, OPAQUE) or OPAQUE
 --	targetDeviceScreenSize = targetDeviceScreenSize or screenW..","..screenH
-	-- case can be ALL_CAPS or NORMAL
+	-- case can be ALL_CAPS or UPPERCASE or LOWERCASE or NORMAL
 	--local case = "NORMAL";
 	-- Space before/after paragraph
 	--local spaceBefore = 0
@@ -874,8 +883,12 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			params.color = settings.color
 			params.width = settings.width
 			params.opacity = settings.opacity
-			-- case (upper/normal)
+			-- case (uppercase/lowercase)
 			params.case = settings.case
+			if (params.case == "all_caps") then
+				params.case = "uppercase"
+			end
+
 			-- space before paragraph
 			params.spaceBefore = settings.spaceBefore or 0
 			-- space after paragraph
@@ -974,6 +987,9 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			settings.opacity = 1.0
 			-- case (upper/normal)
 			if (params[10] and params[10] ~= "") then settings.case = lower(trim(params[10])) end
+			if (settings.case == "all_caps") then
+				settings.case = "uppercase"
+			end
 
 			-- space before paragraph
 			if (params[12] and params[12] ~= "") then settings.spaceBefore = tonumber(params[12]) end
@@ -1403,11 +1419,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				baseline, descent, ascent = getFontAscent(baselineCache, settings.font, settings.size)
 
 
-				-- change case
-				if (settings.case == "all_caps" or settings.case == "uppercase") then
-					restOLine = string.upper(restOLine)
-				end
-
 				-- Width of the text column (not including indents which are paragraph based)
 				settings.currentWidth = settings.width
 				--settings.currentWidth = width - settings.leftIndent - settings.rightIndent - settings.currentFirstLineIndent
@@ -1758,7 +1769,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 										--currentLine = word
 									end
 									allTextInLine = prevTextInLine .. tempLine
-								
 									tempLine = setCase(settings.case, tempLine)
 
 									-- Grab the first words of the line, until "minLineCharCount" hit
@@ -1888,7 +1898,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 														-- This line always goes to the right margin, so you
 														-- can always trim it on the right.
 														currentLine = rtrim(currentLine)
-													
+														currentLine = setCase(settings.case, currentLine)
+
 														local newDisplayLineGroup = display.newGroup()
 
 														local newDisplayLineText = display.newText({
@@ -2095,6 +2106,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 														end
 
 														currentLine = rtrim(currentLine)
+														currentLine = setCase(settings.case, currentLine)
 
 														local newDisplayLineGroup = display.newGroup()
 														--newDisplayLineGroup.anchorChildren = true
@@ -2278,7 +2290,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 
 									local newDisplayLineGroup = display.newGroup()
 								
-									currentLine = currentLine
+									currentLine = setCase(settings.case, currentLine)
+									
 									local newDisplayLineText = display.newText({
 										parent = newDisplayLineGroup,
 										text = currentLine,

@@ -61,6 +61,15 @@ local TRANSPARENT = 0
 -- GRAPHICS 2.0 POSITIONING
 -- ------------------------------------------------------------
 
+-- Problem is, if this goes to quickly, you'll still get non-random numbers,
+-- and I've found some lines execute so fast the 
+local function uniqueID()
+	-- Initialize the pseudo random number generator
+	math.randomseed( os.clock() + system.getTimer() )
+	math.random(); math.random(); math.random()
+	return math.random()
+end
+
 -----------
 -- Shortcut to set x,y to 0,0
 local function toZero(o)
@@ -1932,7 +1941,8 @@ local function popupWebpage(targetURL, color, bkgdAlpha, transitionTime, netrequ
 --print ("popupWebpage:listener")
 --dumptable(event)
 --print ("========")
-							if event.errorCode then
+--print ("event.errorCode",event.errorCode)
+							if ( event.errorCode and event.errorCode ~= -999 ) then
 								-- Error loading page
 								print( "showMyWebPopup: Error: " .. tostring( event.errorMessage ) )
 								shouldLoad = false
@@ -1957,8 +1967,7 @@ local function popupWebpage(targetURL, color, bkgdAlpha, transitionTime, netrequ
 					-- Only need this for local URLs
 					--baseUrl=system.ResourceDirectory,
 				}
---print ("popupWebpage:listener")
---print ("Go to ",targetURL)
+--print ("showWebPopup:",targetURL)
 --print ("========")
 
 				native.showWebPopup(x, y, w, h, targetURL, options )
@@ -4538,7 +4547,6 @@ local function checksum(str)
       end
    end
    --]]
-   print (temp,str)
 	return temp
 end
 
@@ -4656,7 +4664,7 @@ end
 -- Synonyms : title, normal
 -- ====================================================================
 local function setCase(case, str)
-	if case and case ~= "" then
+	if case and case ~= "" and case ~= "none" then
 		case = lower(trim(case))
 		if (case == "lowercase") then
 			str = lower(str)
