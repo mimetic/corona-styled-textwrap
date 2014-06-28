@@ -35,7 +35,8 @@
 
 	Pass params in a table, e.g. options = { ... }
 	Inside of the options table:
-	@param	hyperlinkFillColor	An RGBa string, e.g. "150,200,120,50", of the color for hyperlinks.
+	@param	hyperlinkFillColor	An RGBa string, e.g. "150,200,120,50", of the color for a box around the hyperlinks.
+	@param	hyperlinkTextColor	An RGBa string, e.g. "150,200,120,50", of the color for hyperlink text.
 
 
 ]]
@@ -45,7 +46,9 @@
 local testing = false
 -- Don't use the line-wrap cache
 local noCache = false
-
+if (noCache) then
+	print ("TEXTWRAP: CACHING TURNED OFF!")
+end
 
 -- Main var for this module
 local T = {}
@@ -334,6 +337,7 @@ end
 -- @param cmd A text SQL command, e.g. "SELECT * FROM books"
 local function first_row(db, cmd)
 	local row = false
+	local a
 	for a in db:nrows(cmd) do
 		return a
 	end
@@ -662,7 +666,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	-- Get from the funx textStyles variable.
 	local textstyles = textstyles or {}
 
-	local hyperlinkFillColor
+	local hyperlinkFillColor = "0,0,255,"..TRANSPARENT
+	local hyperlinkTextColor -- "0,0,255,"..OPAQUE
 	
 	T.cacheToDB = true
 
@@ -687,7 +692,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 		defaultStyle = text.defaultStyle or ""
 		cacheDir = text.cacheDir
 		settings.handler = text.handler
-		hyperlinkFillColor = text.hyperlinkFillColor or "0,0,255,"..TRANSPARENT
+		hyperlinkFillColor = text.hyperlinkFillColor or hyperlinkFillColor
+		hyperlinkTextColor = text.hyperlinkTextColor
 		
 		testing = testing or text.testing
 		
@@ -830,7 +836,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	 -- used to restore from bold, bold-italic, etc. since some names aren't clear, e.g. FoozleSemiBold might be the only bold for a font
 	settings.fontvariation = ""
 	settings.size = tonumber(size) or 12
-	settings.color = color or {0,0,0,0}
+	settings.color = color or {0,0,0,255}
 	settings.width = width
 	settings.opacity = funx.applyPercent(opacity, OPAQUE) or OPAQUE
 	settings.targetDeviceScreenSize = targetDeviceScreenSize or screenW..","..screenH
@@ -914,7 +920,9 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			if (params.size ) then settings.size = params.size end
 			if (params.minLineCharCount ) then settings.minLineCharCount = params.minLineCharCount end
 			if (params.lineHeight ) then lineHeight = params.lineHeight end
-			if (params.color ) then settings.color = params.color end
+			if (params.color ) then 
+				settings.color = params.color 
+			end
 			if (params.width ) then settings.width = params.width end
 			if (params.opacity ) then settings.opacity = params.opacity end
 				-- case (upper/normal)
@@ -1378,7 +1386,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				
 				-- Everything is left aligned, the alignment happens after a whole line is built.
 				--textAlignment = "Left"
-				textDisplayReferencePoint = "BottomLeft"
+				local textDisplayReferencePoint = "BottomLeft"
 
 
 				local shortword = ""
@@ -1516,7 +1524,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 							
 
 				local function renderParsedText(parsedText, tag, attr, parseDepth, stacks)
-					
+
 					-- The rendered text with multiple lines in it
 					local result = display.newGroup()
 					
@@ -2388,6 +2396,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 
 					-- save the style settings as they are before
 					-- anything modifies them inside this tag.
+
 					local styleSettings = getAllStyleSettings()
 
 					tag, attr = convertHeaders(tag, attr)
@@ -2474,7 +2483,14 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
  					end
 
 					if (tag == "a") then
-						setStyleFromTag (tag, attr)
+						-- Always use hyperlinkTextColor for the hyperlink text
+						-- NO. InDesign doesn't let us use a <span> to color the text, but it does let us surround the <a>
+						-- with a <span>. I mean, that's how the conversion comes in.
+						-- So, let's require that we color links by hand (or by InDesign)
+						-- Unless we pass the hyperlinkTextColor!
+						if (hyperlinkTextColor) then 
+							attr.color = "(" .. hyperlinkTextColor .. ")"	-- parens are parsed by setStyleFromTag()
+						end
 					end
 
 					-- LIST ITEMS: add a bullet or number
@@ -2502,14 +2518,15 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 
 
 					-- Render XML into lines of text
-					
+
 					for n, element in ipairs(parsedText) do
 						--local styleSettings = {}
 						if (type(element) == "table") then
 --print ("A-Tag",tag)
 							local saveStyleSettings = getAllStyleSettings()
 							-- Apply a font formatting tag, e.g. bold or italic
-							if (tag == "b" or tag == "i" or tag == "em" or tag == "strong" or tag == "font" ) then
+							-- These settings cascade to nested elements
+							if (tag == "span" or tag == "a" or tag == "b" or tag == "i" or tag == "em" or tag == "strong" or tag == "font" ) then
 								setStyleFromTag (tag, attr)
 							end
 
