@@ -1785,9 +1785,11 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 										if (usePeriodsForLineBeginnings and substring(currentLine,1,1) == ".") then
 											currentLine = substring(currentLine,2,-1)
 										end
-									
+
 										-- If a word is less than the minimum word length, force it to be with the next word,so lines don't end with single letter words.
-										if ((strlen(allTextInLine) < nextChunkLen) and strlen(word) < settings.minWordLen) then
+										-- What was this check for? It causes single-letter lines to be lost:
+										-- if ((strlen(allTextInLine) < nextChunkLen) and strlen(word) < settings.minWordLen) then
+										if (strlen(word) < settings.minWordLen) then
 											shortword = shortword..word..spacer
 										else
 
@@ -1980,7 +1982,9 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 														if (not fontInfo.maxHorizontalAdvance) then
 															settings.minLineCharCount = strlen(currentLine)
 														end
-
+														
+														-- Carry over the shortword at the end of the line, e.g. "a"
+														-- the next line by adding it to the current word.
 														word = shortword..word
 
 														-- We have wrapped, don't need text from previous chunks of this line.
@@ -2225,6 +2229,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 								-- end for
 								---------------------------------------------
 
+								currentLine = currentLine .. shortword
 
 								-- Allow for lines with beginning spaces, for positioning
 								if (usePeriodsForLineBeginnings and substring(currentLine,1,1) == ".") then
@@ -2468,8 +2473,10 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 									b = "&#8212;"
 								elseif (attr.bullet == "none") then
 									b = ""
-								else
+								elseif (attr.bullet == "") then
 									b = "&#9679;"
+								elseif (attr.bullet ~= "") then
+									b = attr.bullet
 								end
 								b = entities.convert(b)
 							end
@@ -2504,7 +2511,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 							stacks.list[stacks.list.ptr].line = stacks.list[stacks.list.ptr].line + 1
 						else
 							t = stacks.list[stacks.list.ptr].bullet or ""
-
 						end
 						-- add a space after the bullet
 						t = t .. " "
