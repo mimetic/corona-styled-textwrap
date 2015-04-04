@@ -265,7 +265,7 @@ end
 
 if textwrap.db and textwrap.db:isopen() then
 	textwrap.db:close()
-	print ("MAIN TESTING: Close DB")
+	print ("MAIN TESTING: Close DB. The textwrap database was left open?")
 end
 
 
