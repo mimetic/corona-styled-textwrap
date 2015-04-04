@@ -35,7 +35,8 @@
 
 	Pass params in a table, e.g. options = { ... }
 	Inside of the options table:
-	@param	hyperlinkFillColor	An RGBa string, e.g. "150,200,120,50", of the color for hyperlinks.
+	@param	hyperlinkFillColor	An RGBa string, e.g. "150,200,120,50", of the color for a box around the hyperlinks.
+	@param	hyperlinkTextColor	An RGBa string, e.g. "150,200,120,50", of the color for hyperlink text.
 
 
 ]]
@@ -43,7 +44,11 @@
 
 -- TESTING
 local testing = false
-
+-- Don't use the line-wrap cache
+local noCache = false
+if (noCache) then
+	print ("TEXTWRAP: CACHING TURNED OFF!")
+end
 
 -- Main var for this module
 local T = {}
@@ -63,6 +68,7 @@ local crypto = require "crypto"
 local max = math.max
 local min = math.min
 local lower = string.lower
+local upper = string.upper
 local gmatch = string.gmatch
 local gsub = string.gsub
 local strlen = string.len
@@ -331,6 +337,7 @@ end
 -- @param cmd A text SQL command, e.g. "SELECT * FROM books"
 local function first_row(db, cmd)
 	local row = false
+	local a
 	for a in db:nrows(cmd) do
 		return a
 	end
@@ -659,7 +666,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	-- Get from the funx textStyles variable.
 	local textstyles = textstyles or {}
 
-	local hyperlinkFillColor
+	local hyperlinkFillColor = "0,0,255,"..TRANSPARENT
+	local hyperlinkTextColor -- "0,0,255,"..OPAQUE
 	
 	T.cacheToDB = true
 
@@ -684,7 +692,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 		defaultStyle = text.defaultStyle or ""
 		cacheDir = text.cacheDir
 		settings.handler = text.handler
-		hyperlinkFillColor = text.hyperlinkFillColor or "0,0,255,"..TRANSPARENT
+		hyperlinkFillColor = text.hyperlinkFillColor or hyperlinkFillColor
+		hyperlinkTextColor = text.hyperlinkTextColor
 		
 		testing = testing or text.testing
 		
@@ -696,6 +705,15 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 		-- restore text
 		text = text.text
 	end
+	
+	-- If no text, do nothing.
+	if (not text) then
+		return result
+	end
+	
+	
+	-- Be sure text isn't nil
+	text = text or ""
 
 	-- Caching values
 	-- Name the cache with the width, too, so the same text isn't wrapped to the wrong
@@ -711,6 +729,12 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	-- Interpret the width so we can get it right caching:
 	width = funx.percentOfScreenWidth(width) or display.contentWidth
 	
+	-- TESTING
+	if (noCache) then
+		cacheDir = nil
+		T.cacheToDB = false
+	end
+		
 	-- Default is to cache using the sqlite3 database.
 	-- If cacheToDB is FALSE, then we fall back on the text file cacheing
 	-- if cacheDir is set.
@@ -782,8 +806,11 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	text = text:gsub(funx.unescape(lineSeparatorCode),"")
 	text = text:gsub(funx.unescape(paragraphSeparatorCode),"")
 
+
 	-- Convert entities in the text, .e.g. "&#8211;"
-	text = entities.unescape(text)
+	if (not settings.isHTML) then
+		text = entities.unescape(text)
+	end
 
 
 	--- THEN, TOO, THERE'S MY OWN FLAVOR OF LINE BREAK!
@@ -793,7 +820,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	------------------------
 
 	maxHeight = tonumber(maxHeight) or 0
-
 
 	-- Minimum number of characters per line. Start low.
 	--local minLineCharCount = minCharCount or 5
@@ -805,7 +831,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 --	width = funx.percentOfScreenWidth(width) or display.contentWidth
 --	opacity = funx.applyPercent(opacity, OPAQUE) or OPAQUE
 --	targetDeviceScreenSize = targetDeviceScreenSize or screenW..","..screenH
-	-- case can be ALL_CAPS or NORMAL
+	-- case can be ALL_CAPS or UPPERCASE or LOWERCASE or NORMAL
 	--local case = "NORMAL";
 	-- Space before/after paragraph
 	--local spaceBefore = 0
@@ -821,7 +847,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	 -- used to restore from bold, bold-italic, etc. since some names aren't clear, e.g. FoozleSemiBold might be the only bold for a font
 	settings.fontvariation = ""
 	settings.size = tonumber(size) or 12
-	settings.color = color or {0,0,0,0}
+	settings.color = color or {0,0,0,255}
 	settings.width = width
 	settings.opacity = funx.applyPercent(opacity, OPAQUE) or OPAQUE
 	settings.targetDeviceScreenSize = targetDeviceScreenSize or screenW..","..screenH
@@ -874,8 +900,12 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			params.color = settings.color
 			params.width = settings.width
 			params.opacity = settings.opacity
-			-- case (upper/normal)
+			-- case (uppercase/lowercase)
 			params.case = settings.case
+			if (params.case == "all_caps") then
+				params.case = "uppercase"
+			end
+
 			-- space before paragraph
 			params.spaceBefore = settings.spaceBefore or 0
 			-- space after paragraph
@@ -901,7 +931,9 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			if (params.size ) then settings.size = params.size end
 			if (params.minLineCharCount ) then settings.minLineCharCount = params.minLineCharCount end
 			if (params.lineHeight ) then lineHeight = params.lineHeight end
-			if (params.color ) then settings.color = params.color end
+			if (params.color ) then 
+				settings.color = params.color 
+			end
 			if (params.width ) then settings.width = params.width end
 			if (params.opacity ) then settings.opacity = params.opacity end
 				-- case (upper/normal)
@@ -974,6 +1006,9 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			settings.opacity = 1.0
 			-- case (upper/normal)
 			if (params[10] and params[10] ~= "") then settings.case = lower(trim(params[10])) end
+			if (settings.case == "all_caps") then
+				settings.case = "uppercase"
+			end
 
 			-- space before paragraph
 			if (params[12] and params[12] ~= "") then settings.spaceBefore = tonumber(params[12]) end
@@ -1190,10 +1225,10 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local paragraphbreak = funx.unescape(paragraphSeparatorCode)
 	local oneLinePattern = "[^\n^\r]+"
 	local oneLinePattern = ".-[\n\r]"
-
 	if (settings.isHTML) then
 		--print ("Autowrap: line 500 : text is HTML!")
-		text = trim(text:gsub("[\n\r]+"," "))
+		text = text:gsub("[\n\r]+"," ")
+		text = trim(text, false)
 	end
 
 	-- ----------------------
@@ -1362,7 +1397,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 				
 				-- Everything is left aligned, the alignment happens after a whole line is built.
 				--textAlignment = "Left"
-				textDisplayReferencePoint = "BottomLeft"
+				local textDisplayReferencePoint = "BottomLeft"
 
 
 				local shortword = ""
@@ -1402,11 +1437,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 
 				baseline, descent, ascent = getFontAscent(baselineCache, settings.font, settings.size)
 
-
-				-- change case
-				if (settings.case == "all_caps" or settings.case == "uppercase") then
-					restOLine = string.upper(restOLine)
-				end
 
 				-- Width of the text column (not including indents which are paragraph based)
 				settings.currentWidth = settings.width
@@ -1505,7 +1535,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 							
 
 				local function renderParsedText(parsedText, tag, attr, parseDepth, stacks)
-					
+
 					-- The rendered text with multiple lines in it
 					local result = display.newGroup()
 					
@@ -1571,12 +1601,9 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 								end
 							end
 
-
 							
 							-- =======================================================
 							-- =======================================================
-
-
 
 							-- flag to indicate the text line to be rendered is the last line of the previously
 							-- rendered text (true) or is the continuation of that text (false)
@@ -1758,7 +1785,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 										--currentLine = word
 									end
 									allTextInLine = prevTextInLine .. tempLine
-								
 									tempLine = setCase(settings.case, tempLine)
 
 									-- Grab the first words of the line, until "minLineCharCount" hit
@@ -1767,9 +1793,11 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 										if (usePeriodsForLineBeginnings and substring(currentLine,1,1) == ".") then
 											currentLine = substring(currentLine,2,-1)
 										end
-									
+
 										-- If a word is less than the minimum word length, force it to be with the next word,so lines don't end with single letter words.
-										if ((strlen(allTextInLine) < nextChunkLen) and strlen(word) < settings.minWordLen) then
+										-- What was this check for? It causes single-letter lines to be lost:
+										-- if ((strlen(allTextInLine) < nextChunkLen) and strlen(word) < settings.minWordLen) then
+										if (strlen(word) < settings.minWordLen) then
 											shortword = shortword..word..spacer
 										else
 
@@ -1888,7 +1916,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 														-- This line always goes to the right margin, so you
 														-- can always trim it on the right.
 														currentLine = rtrim(currentLine)
-													
+														currentLine = setCase(settings.case, currentLine)
+
 														local newDisplayLineGroup = display.newGroup()
 
 														local newDisplayLineText = display.newText({
@@ -1961,7 +1990,9 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 														if (not fontInfo.maxHorizontalAdvance) then
 															settings.minLineCharCount = strlen(currentLine)
 														end
-
+														
+														-- Carry over the shortword at the end of the line, e.g. "a"
+														-- the next line by adding it to the current word.
 														word = shortword..word
 
 														-- We have wrapped, don't need text from previous chunks of this line.
@@ -2095,6 +2126,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 														end
 
 														currentLine = rtrim(currentLine)
+														currentLine = setCase(settings.case, currentLine)
 
 														local newDisplayLineGroup = display.newGroup()
 														--newDisplayLineGroup.anchorChildren = true
@@ -2205,6 +2237,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 								-- end for
 								---------------------------------------------
 
+								currentLine = currentLine .. shortword
+								shortword = ""
 
 								-- Allow for lines with beginning spaces, for positioning
 								if (usePeriodsForLineBeginnings and substring(currentLine,1,1) == ".") then
@@ -2278,7 +2312,8 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 
 									local newDisplayLineGroup = display.newGroup()
 								
-									currentLine = currentLine
+									currentLine = setCase(settings.case, currentLine)
+									
 									local newDisplayLineText = display.newText({
 										parent = newDisplayLineGroup,
 										text = currentLine,
@@ -2375,9 +2410,13 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 
 					-- save the style settings as they are before
 					-- anything modifies them inside this tag.
+
 					local styleSettings = getAllStyleSettings()
 
 					tag, attr = convertHeaders(tag, attr)
+					
+					-- Be sure the tag isn't null
+					tag = tag or ""
 					tag = lower(tag)
 
 					local listIdentDistance = 20
@@ -2446,8 +2485,10 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 									b = "&#8212;"
 								elseif (attr.bullet == "none") then
 									b = ""
-								else
+								elseif (attr.bullet == "") then
 									b = "&#9679;"
+								elseif (attr.bullet ~= "") then
+									b = attr.bullet
 								end
 								b = entities.convert(b)
 							end
@@ -2461,7 +2502,14 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
  					end
 
 					if (tag == "a") then
-						setStyleFromTag (tag, attr)
+						-- Always use hyperlinkTextColor for the hyperlink text
+						-- NO. InDesign doesn't let us use a <span> to color the text, but it does let us surround the <a>
+						-- with a <span>. I mean, that's how the conversion comes in.
+						-- So, let's require that we color links by hand (or by InDesign)
+						-- Unless we pass the hyperlinkTextColor!
+						if (hyperlinkTextColor) then 
+							attr.color = "(" .. hyperlinkTextColor .. ")"	-- parens are parsed by setStyleFromTag()
+						end
 					end
 
 					-- LIST ITEMS: add a bullet or number
@@ -2475,7 +2523,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 							stacks.list[stacks.list.ptr].line = stacks.list[stacks.list.ptr].line + 1
 						else
 							t = stacks.list[stacks.list.ptr].bullet or ""
-
 						end
 						-- add a space after the bullet
 						t = t .. " "
@@ -2489,14 +2536,15 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 
 
 					-- Render XML into lines of text
-					
+
 					for n, element in ipairs(parsedText) do
 						--local styleSettings = {}
 						if (type(element) == "table") then
 --print ("A-Tag",tag)
 							local saveStyleSettings = getAllStyleSettings()
 							-- Apply a font formatting tag, e.g. bold or italic
-							if (tag == "b" or tag == "i" or tag == "em" or tag == "strong" or tag == "font" ) then
+							-- These settings cascade to nested elements
+							if (tag == "span" or tag == "a" or tag == "b" or tag == "i" or tag == "em" or tag == "strong" or tag == "font" ) then
 								setStyleFromTag (tag, attr)
 							end
 
@@ -2619,7 +2667,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			result:insert(oneXMLBlock)
 			oneXMLBlock.anchorX, oneXMLBlock.anchorY = 0, 0
 		end -- html elements for one paragraph
-
 
 	end
 

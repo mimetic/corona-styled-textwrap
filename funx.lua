@@ -44,12 +44,19 @@ local floor = math.floor
 local min = math.min
 local max = math.max
 local random = math.random
+
+local char = string.char
+local byte = string.byte
 local match = string.match
 local gmatch = string.gmatch
 local find = string.find
+local gsub = string.gsub
+local substring = string.sub
 local gfind = string.gfind
 local lower = string.lower
 local upper = string.upper
+local strlen = string.len
+local format = string.format
 
 -- ALPHA VALUES, can change for RGB or HDR systems
 local OPAQUE = 255
@@ -60,6 +67,15 @@ local TRANSPARENT = 0
 -- -------------------------------------------------------------
 -- GRAPHICS 2.0 POSITIONING
 -- ------------------------------------------------------------
+
+-- Problem is, if this goes to quickly, you'll still get non-random numbers,
+-- and I've found some lines execute so fast the 
+local function uniqueID()
+	-- Initialize the pseudo random number generator
+	math.randomseed( os.clock() + system.getTimer() )
+	math.random(); math.random(); math.random()
+	return math.random()
+end
 
 -----------
 -- Shortcut to set x,y to 0,0
@@ -131,6 +147,45 @@ end
 
 
 -- ------------------------------------------------------------
+-- Simple encrypt/decrypt
+--[[
+EXAMPLE:
+local enc1 = {29, 58, 93, 28, 27};
+local str = "This is an encrypted string.";
+local crypted = crypt(str,enc1)
+print("Encryption: " .. crypted);
+print("Decryption: " .. crypt(crypted,enc1,true));
+--]]
+-- ------------------------------------------------------------
+local function crypt(str,k,inv)
+
+	local function convert( chars, dist, inv )
+		return string.char( ( string.byte( chars ) - 32 + ( inv and -dist or dist ) ) % 95 + 32 )
+	end
+
+	local enc= "";
+	for i=1,#str do
+		if(#str-k[5] >= i or not inv) then
+			for inc=0,3 do
+				if(i%4 == inc)then
+					enc = enc .. convert(string.sub(str,i,i),k[inc+1],inv);
+					break;
+				end
+			end
+		end
+	end
+
+	if(not inv)then
+		for i=1,k[5] do
+			enc = enc .. string.char(math.random(32,126));
+		end
+	end
+	return enc;
+end
+
+
+
+-- ------------------------------------------------------------
 -- Get the string index in system table of a system directory
 -- ------------------------------------------------------------
 local function indexOfSystemDirectory( systemPath )
@@ -157,7 +212,7 @@ local function timePassed(msg)
 	local t = t2 - lastTimePassed
 	lastTimePassed = t2
 	msg = msg or ""
-	print ("funx.timePassed: ", math.floor(t) .. "ms", msg) --, "Total:", math.floor(t2-firstTime))
+	print ("funx.timePassed: ", floor(t) .. "ms", msg) --, "Total:", floor(t2-firstTime))
 	io.flush( )
 end
 
@@ -171,7 +226,7 @@ local function printFuncName(n)
 	if info.what == "C" then   -- is a C function?
 	  print(n, "C function")
 	else   -- a Lua function
-	  print(string.format("[%s]:%d", info.name, info.currentline))
+	  print(format("[%s]:%d", info.name, info.currentline))
 	end
 end
 
@@ -191,7 +246,7 @@ local function traceback ()
 		if info.what == "C" then	 -- is a C function?
 			print(level, "C function")
 		else	 -- a Lua function
-			print(string.format("[%s]:%d",
+			print(format("[%s]:%d",
 								info.short_src, info.currentline))
 		end
 		level = level + 1
@@ -206,7 +261,7 @@ local function round2(num, idp)
 end
 
 local function round(num, idp)
-  return tonumber(string.format("%." .. (idp or 0) .. "f", num))
+  return tonumber(format("%." .. (idp or 0) .. "f", num))
 end
 
 -----------------
@@ -239,16 +294,16 @@ local function unescape (s)
 	if (not s) then
 		return ""
 	end
-	s = string.gsub(s, "+", " ")
-	s = string.gsub(s, "%%(%x%x)", function (h)
-		return string.char(tonumber(h, 16))
+	s = gsub(s, "+", " ")
+	s = gsub(s, "%%(%x%x)", function (h)
+		return char(tonumber(h, 16))
 	end)
 	return s
 end
 
 local function escape(s)
-	s = string.gsub(s, "([&=+%c])", function(c)return string.format("%%%02X", string.byte(c))end)
-	s = string.gsub(s, " ", "+")
+	s = gsub(s, "([&=+%c])", function(c)return format("%%%02X", byte(c))end)
+	s = gsub(s, " ", "+")
 	return s
 end
 
@@ -297,11 +352,33 @@ end
 -- @return	res	Key:value pairs: original key => clean key
 -- e.g. { "icon-1" = "myicon.jpg" } ===> { "icon-1" = "icon%-1" }
 local function getEscapedKeysForGsub(t)
-	local gsub = string.gsub
 	-- Chars to escape: ( ) . % + - * ? [ ^ $
 	local res = {}
 	for i,v in pairs(t) do
 		res[i] = gsub(i, "([%(%)%.%%%+%-%*%?%[%^%$])", "%%%1")
+	end
+	return res
+end
+
+
+--- Flatten a table for substitutions
+-- Create a flat table from the prefs that can be used for word subsitutions in strings,
+-- e.g. Replacing name in "My {{name}}", where name is inside of a subtable such as "user".
+-- Seems like a waste of processing, but this way we can use hierarchical prefs, probably a good thing
+-- @flatPrefs	[table] Used for recursion, so don't pass anything to it or it won't start with the PREFS.values table.
+local function flattenTable(t)
+	local res = {}
+	for k,v in pairs(t) do
+		if (type(v) ~= "table") then
+			-- Capture a non-table value
+			res[k] = v
+		else
+			-- Flatten a subtable
+			local subset = flattenTable(v)
+			for ks,vs in pairs(subset) do
+				res[k .. ":" .. ks] = vs
+			end
+		end
 	end
 	return res
 end
@@ -315,7 +392,6 @@ end
 -- @param escapeTheKeys	if TRUE then escape the keys of the subsitutions table (t), if a table then use that table as the escaped keys table
 -- @return s	string with replacements
 local function substitutions (s, t, escapeTheKeys)
-	local gsub = string.gsub
 
 	if (not s or not t or t=={}) then
 		--print ("funx.substitutions: No Values passed!")
@@ -356,10 +432,10 @@ local function OLD_substitutionsSLOWER (s, t)
 	local r = gfind(s,"%{%{.-%}%}")
 	local res = s
 	for wrd in r do
-		local i,j = string.find(wrd, "%{%{(.-)%}%}")
-		local k = string.sub(wrd,i+2,j-2)
+		local i,j = find(wrd, "%{%{(.-)%}%}")
+		local k = sub(wrd,i+2,j-2)
 		if (t[k]) then
-			res = string.gsub(res, wrd, t[k])
+			res = gsub(res, wrd, t[k])
 		end
 --print ("substitutions for in "..res.." for {{"..k.."}} with ",t[k], "RESULT:",res)
 
@@ -420,7 +496,7 @@ local function tableRemoveUnusedCodedElements(t )
 
 	for i,element in pairs(t) do
 		if (i ~= "screen") then
-			if (type(element) == "string" and string.find(element, "%{%{.-%}%}")) then
+			if (type(element) == "string" and find(element, "%{%{.-%}%}")) then
 --print ("tableRemoveUnusedCodedElements: Remove ", t[i])
 				t[i] = ""
 			elseif (type(element) == "table") then
@@ -441,7 +517,7 @@ local function hasFieldCodes(s)
 		return false
 	end
 	s = s or ""
-	local r = string.find(s,"%{%{.-%}%}")
+	local r = find(s,"%{%{.-%}%}")
 	if (r) then
 		return true
 	else
@@ -458,7 +534,7 @@ local function hasFieldCodesSingle(s)
 		return false
 	end
 	s = s or ""
-	local r = string.find(s,"%b{}")
+	local r = find(s,"%b{}")
 	if (r) then
 		return true
 	else
@@ -482,7 +558,7 @@ end
 
 
 -- Dump an XML table
-local function dumptable(_class, no_func, depth)
+local function dumptable(_class, no_func, depth, maxDepth)
 	if (not _class) then
 		print ("dumptable: not a class.");
 		return;
@@ -493,8 +569,10 @@ local function dumptable(_class, no_func, depth)
 	for n=0,depth,1 do
 		str=str.."\t";
 	end
+	
+	maxDepth = maxDepth or 3
 
-	if (depth > 10) then
+	if (depth > maxDepth) then
 		print ("Oops, running away! Depth is "..depth)
 		return
 	end
@@ -506,7 +584,7 @@ local function dumptable(_class, no_func, depth)
 		for i,field in pairs(_class) do
 			if(type(field)=="table") then
 				local fn = tostring(i)
-				if (string.sub(fn,1,2) == "__") then
+				if (substring(fn,1,2) == "__") then
 								print (str.."\t"..tostring(i).." = (not expanding this internal table)");
 				else
 					print (str.."\t"..tostring(i).." =");
@@ -514,11 +592,11 @@ local function dumptable(_class, no_func, depth)
 				end
 			else
 				if(type(field)=="number") then
-					print (str.."\t"..tostring(i).."="..field);
+					print (str.." [num]\t"..tostring(i).."="..field);
 				elseif(type(field) == "string") then
-					print (str.."\t"..tostring(i).."=".."\""..field.."\"");
+					print (str.." [str]\t"..tostring(i).."=".."\""..field.."\"");
 				elseif(type(field) == "boolean") then
-					print (str.."\t"..tostring(i).."=".."\""..tostring(field).."\"");
+					print (str.." [bool]\t"..tostring(i).."=".."\""..tostring(field).."\"");
 				else
 					if(not no_func)then
 						if(type(field)=="function")then
@@ -629,7 +707,7 @@ local function removeFields (s)
 	local r = gfind(s,"%{%{.-%}%}")
 	local res = s
 	for wrd in r do
-		res = trim(string.gsub(res, wrd, ""))
+		res = trim(gsub(res, wrd, ""))
 	end
 	return res
 end
@@ -640,7 +718,7 @@ local function removeFieldsSingle (s)
 	local r = gfind(s,"%b{}")
 	local res = s
 	for wrd in r do
-		res = trim(string.gsub(res, wrd, ""))
+		res = trim(gsub(res, wrd, ""))
 	end
 	return res
 end
@@ -718,7 +796,7 @@ end
 -------------------------------------------------
 local function scaleFactorForRetina()
 	local deviceWidth = ( display.contentWidth - (display.screenOriginX * 2) ) / display.contentScaleX
-	local scaleFactor = math.floor( deviceWidth / display.contentWidth )
+	local scaleFactor = floor( deviceWidth / display.contentWidth )
 	return scaleFactor
 end
 
@@ -768,7 +846,7 @@ end
 -- Used to reposition coordinates that were set up for the iPad, e.g. x,y positions
 -- If the screen is a different shape, pad the x to make up for it
 -- iPad is 1024/768 = 133/100 (1.33)
--- CONVERT results to integer (math.floor)
+-- CONVERT results to integer (floor)
 local function rescaleFromIpad(x,y)
 
 	-- Do nothing if this is an iPad screen!
@@ -834,11 +912,11 @@ local function applyPercent (x,y,noRound)
 
 	x = x or 0
 	y = y or 0
-	local v = string.match(trim(x), "(.+)%%$")
+	local v = match(trim(x), "(.+)%%$")
 	if v then
 		v = (v / 100) * y
 		if ((not noRound) and (y>1)) then
-			v = math.floor(v+0.5)
+			v = floor(v+0.5)
 		end
 	else
 		v = x
@@ -942,7 +1020,7 @@ end
 -- Load a table form a text file.
 -- The table is stored as comma-separated name=value pairs.
 local function loadTableFromFile(filePath, s)
-	local substring = string.sub
+	local substring = substring
 
 	if (not filePath) then
 		print ("WARNING: loadTableFromFile: Missing file name.")
@@ -1031,8 +1109,8 @@ local function getScaledFilename(filename, d)
 		local scalesuffix = "@"..scalingRatio.."x"
 
 		-- Is there an other sized version?
-		local suffix = string.sub(filename, string.len(filename)-3, -1)
-		local name = string.sub(filename, 1, string.len(filename)-4)
+		local suffix = substring(filename, strlen(filename)-3, -1)
+		local name = substring(filename, 1, strlen(filename)-4)
 		local f2 = name .. scalesuffix .. suffix
 
 		-- If no scaled file, get original
@@ -1057,22 +1135,33 @@ end
 -- Every time we load, save the size to a list we maintain.
 -- *** The first time, the list will be taken from the resources directory!
 
-local ImageInfoList = loadTable("images_info.json", system.CachesDirectory)
-if (not ImageInfoList) then
-	ImageInfoList = loadTable("_user/images_info.json", system.ResourceDirectory) or {}
-end
+
 
 local function getImageSize(f,d)
 	d = d or system.ResourceDirectory
+	
+	local imageInfoList
+	if (not FUNX.imageInfoList) then
+		imageInfoList = loadTable("images_info.json", system.CachesDirectory)
+		if (not imageInfoList) then
+			imageInfoList = loadTable("_user/images_info.json", system.ResourceDirectory) or {}
+			if (not imageInfoList) then
+				print ("Warning: funx.getImageSize() : Could not find file, images_info.json")
+			end
+		end
+		FUNX.imageInfoList = imageInfoList
+	else
+		imageInfoList = FUNX.imageInfoList
+	end
 
 	-- load info table, if not loaded
-	if (not ImageInfoList) then
-		ImageInfoList = loadTable("images_info.json", system.CachesDirectory)
+	if (not imageInfoList) then
+		imageInfoList = loadTable("images_info.json", system.CachesDirectory)
 	end
 
 	-- Check the sizes list for this image
-	if (ImageInfoList[f]) then
-		return ImageInfoList[f].width, ImageInfoList[f].height
+	if (imageInfoList[f]) then
+		return imageInfoList[f].width, imageInfoList[f].height
 	else
 		-- add to the list
 		local i = display.newImage(f,d,true)
@@ -1081,8 +1170,8 @@ local function getImageSize(f,d)
 		i:removeSelf()
 		i = nil
 
-		ImageInfoList[f] = { width = w, height = h }
-		saveTable(ImageInfoList, "images_info.json", system.CachesDirectory)
+		imageInfoList[f] = { width = w, height = h }
+		saveTable(imageInfoList, "images_info.json", system.CachesDirectory)
 		return w,h
 	end
 end
@@ -1191,90 +1280,92 @@ local function loadImageFile(filename, wildcardPath, whichSystemDirectory, showT
 	local scalesuffix = ""
 	local otherFound = false
 
-	wildcardPath = wildcardPath or "_user"
+	if (filename) then
+		wildcardPath = wildcardPath or "_user"
 
-	-- If the filename starts with a wildcard, then replace it with the wildcardPath
-	local wc = string.sub(filename,1,1)
-	if (wc == "*" and wildcardPath) then
-		filename = replaceWildcard(filename, wildcardPath)
+		-- If the filename starts with a wildcard, then replace it with the wildcardPath
+		local wc = substring(filename,1,1)
+		if (wc == "*" and wildcardPath) then
+			filename = replaceWildcard(filename, wildcardPath)
 
-		-- Files inside _user are system files, everything else with a wildcard is
-		-- a downloaded book.
-		if (not find(wildcardPath, "^_user") ) then
-		--if (wildcardPath ~= "_user") then
-			whichSystemDirectory = whichSystemDirectory or system.CachesDirectory
-		else
-			whichSystemDirectory = whichSystemDirectory or system.ResourceDirectory
-		end
-	end
-
-	-- default to system for files, e.g. _ui/mygraphic.jpg
-	whichSystemDirectory = whichSystemDirectory or system.ResourceDirectory
-
-	if (fileExists(filename, whichSystemDirectory)) then
-		local image
-
-		-- My method for loading images
-		if (otherFound) then
-		--local path = system.pathForFile( filename, whichSystemDirectory )
-			image = display.newImage(filename, whichSystemDirectory, true)
-			image:scale(scaleFraction, scaleFraction)
---print ("loadImageFile: Using my method:", filename)
-		else
-			-- Corona newImageRect version for loading images
-			-- Check for a scaled file before loading it
-			local f,s = getScaledFilename(filename, whichSystemDirectory)
---timePassed("loadImageFile start loading..."..filename)
-			-- If scale comes back ~= 1 then there is a scaled version
-			-- and there is need of one.
-			if (s ~= 1) then
-				local w,h = getImageSize(filename,whichSystemDirectory)
-				image = display.newImageRect(filename, whichSystemDirectory, w, h)
---timePassed("loadImageFile, Loaded using newImageRect, C1:"..filename)
+			-- Files inside _user are system files, everything else with a wildcard is
+			-- a downloaded book.
+			if (not find(wildcardPath, "^_user") ) then
+			--if (wildcardPath ~= "_user") then
+				whichSystemDirectory = whichSystemDirectory or system.CachesDirectory
 			else
-				image = display.newImage(filename, whichSystemDirectory, true)
---timePassed("loadImageFile, loaded using newImage, C2:"..filename)
+				whichSystemDirectory = whichSystemDirectory or system.ResourceDirectory
 			end
---print ("loadImageFile: Using Corona method:", filename)
 		end
-		anchorZero(image, "Center")
 
-		return image, scaleFraction
-	else
-		
-		-- DEBUGGING TOOL
-		if (showTraceOnFailure) then
-			print ("funx.loadImageFile called by:")
-			traceback()
+		-- default to system for files, e.g. _ui/mygraphic.jpg
+		whichSystemDirectory = whichSystemDirectory or system.ResourceDirectory
+
+		if (fileExists(filename, whichSystemDirectory)) then
+			local image
+
+			-- My method for loading images
+			if (otherFound) then
+			--local path = system.pathForFile( filename, whichSystemDirectory )
+				image = display.newImage(filename, whichSystemDirectory, true)
+				image:scale(scaleFraction, scaleFraction)
+	--print ("loadImageFile: Using my method:", filename)
+			else
+				-- Corona newImageRect version for loading images
+				-- Check for a scaled file before loading it
+				local f,s = getScaledFilename(filename, whichSystemDirectory)
+	--timePassed("loadImageFile start loading..."..filename)
+				-- If scale comes back ~= 1 then there is a scaled version
+				-- and there is need of one.
+				if (s ~= 1) then
+					local w,h = getImageSize(filename,whichSystemDirectory)
+					image = display.newImageRect(filename, whichSystemDirectory, w, h)
+	--timePassed("loadImageFile, Loaded using newImageRect, C1:"..filename)
+				else
+					image = display.newImage(filename, whichSystemDirectory, true)
+	--timePassed("loadImageFile, loaded using newImage, C2:"..filename)
+				end
+	--print ("loadImageFile: Using Corona method:", filename)
+			end
+			anchorZero(image, "Center")
+
+			return image, scaleFraction
 		end
-	
-		local i = display.newGroup()
-		i.anchorChildren = true
-		anchorZero(i, "Center")
-
-		local image = display.newImage(i, "_ui/missing-image.png", system.ResourceDirectory, true)
-		
-		-- Write to the log!
-		local syspath =  system.pathForFile( "", whichSystemDirectory )
-		--print ("loadImageFile: whichSystemDirectory", syspath )
-		if (syspath == "") then
-				syspath = "ResourceDirectory"
-		end
-		print ("WARNING: loadImageFile cannot find ",filename," in ",syspath)
-
-		local t = display.newText( "Cannot find:"..filename, 0, 0, native.systemFontBold, 24 )
-		i:insert(t)
-		image.x = midscreenX
-		image.y = midscreenY
-		anchor(t, "Center")
-		t.x = midscreenX
-		t.y = midscreenY+40
-		anchor(i, "Center")
-		i.x = 0
-		i.y = 0
-		-- second returned value is scaleFraction and 1 does nothing but won't crash stuff
-		return i, 1
 	end
+	-- FAILURE
+		
+	-- DEBUGGING TOOL
+	if (showTraceOnFailure) then
+		print ("funx.loadImageFile called by:")
+		traceback()
+	end
+
+	local i = display.newGroup()
+	i.anchorChildren = true
+	anchorZero(i, "Center")
+
+	local image = display.newImage(i, "_ui/missing-image.png", system.ResourceDirectory, true)
+	
+	-- Write to the log!
+	local syspath =  system.pathForFile( "", whichSystemDirectory )
+	--print ("loadImageFile: whichSystemDirectory", syspath )
+	if (syspath == "") then
+			syspath = "ResourceDirectory"
+	end
+	print ("WARNING: loadImageFile cannot find ",filename," in ",syspath)
+
+	local t = display.newText( "Cannot find:" .. filename, 0, 0, native.systemFontBold, 24 )
+	i:insert(t)
+	image.x = midscreenX
+	image.y = midscreenY
+	anchor(t, "Center")
+	t.x = midscreenX
+	t.y = midscreenY+40
+	anchor(i, "Center")
+	i.x = 0
+	i.y = 0
+	-- second returned value is scaleFraction and 1 does nothing but won't crash stuff
+	return i, 1
 end
 
 
@@ -1310,7 +1401,7 @@ local function hasNetConnection(url,showActivity)
 	test:settimeout(1, 't') -- timeout 5 sec
 
 	url = url or "www.google.com"
-	if (string.sub(url, 1, 4) == "http") then
+	if (substring(url, 1, 4) == "http") then
 		url = url:gsub("^https?://", "")
 	end
 	local testResult = test:connect(url,80)
@@ -1429,7 +1520,6 @@ local function stringToColorTable(s, toHDR, isHDR)
 		s = trim(s, true)
 		if (s) then
 			s = split(s, ",")
-
 			local maxVal = 255	-- RGB max
 			--[[
 			local valSum = ( tonumber(s[1]) or 0) + (tonumber(s[2]) or 0) + (tonumber(s[3]) or 0)
@@ -1500,6 +1590,7 @@ local function frameGroup(g, s, color)
 	r:toBack()
 	r.anchorX, r.anchorY = 0,0
 	r.x, r.y = bounds.xMin, bounds.yMin
+	g._frame = r
 end
 
 
@@ -1512,9 +1603,9 @@ end
 -- Because the object which will contain the image might
 -- be scaled, we need to include a scaling
 -- factor, to adjust the screen image.
--- locked: default is no lock, if true then lock the screen from touches
+-- locked: if true or a function then lock the screen from touches or pass touch to the function.
 -------------------------------------------------
-local function dimScreen(transitionTime, color, scaling, locked)
+local function dimScreen(transitionTime, color, scaling, onTouch)
 
 	transitionTime = transitionTime or 300
 	color = color or { 0.75 * OPAQUE }
@@ -1527,8 +1618,12 @@ local function dimScreen(transitionTime, color, scaling, locked)
 	bkgdrect:setFillColor( unpack(c) )
 	bkgdrect:scale(1/scaling, 1/scaling)
 	transition.to (bkgdrect, {alpha=opacity, time=transitionTime } )
-
-	bkgdrect:addEventListener("touch", function() return locked end )
+	
+	if (type(onTouch) ~= "function") then
+		onTouch = function() return onTouch; end
+	end
+	
+	bkgdrect:addEventListener("touch", onTouch )
 
 	return bkgdrect
 end
@@ -1932,7 +2027,8 @@ local function popupWebpage(targetURL, color, bkgdAlpha, transitionTime, netrequ
 --print ("popupWebpage:listener")
 --dumptable(event)
 --print ("========")
-							if event.errorCode then
+--print ("event.errorCode",event.errorCode)
+							if ( event.errorCode and event.errorCode ~= -999 ) then
 								-- Error loading page
 								print( "showMyWebPopup: Error: " .. tostring( event.errorMessage ) )
 								shouldLoad = false
@@ -1957,8 +2053,7 @@ local function popupWebpage(targetURL, color, bkgdAlpha, transitionTime, netrequ
 					-- Only need this for local URLs
 					--baseUrl=system.ResourceDirectory,
 				}
---print ("popupWebpage:listener")
---print ("Go to ",targetURL)
+--print ("showWebPopup:",targetURL)
 --print ("========")
 
 				native.showWebPopup(x, y, w, h, targetURL, options )
@@ -1974,12 +2069,15 @@ local function popupWebpage(targetURL, color, bkgdAlpha, transitionTime, netrequ
 	--------------------------
 	
 	-- Do we have network?
-	local testurl = targetURL
-	if (string.sub(testurl, 1, 4) == "http") then
+	-- Don't test with our URL, since it might have authentication in it,
+	-- e.g. human:password@myurl.com
+	--local testurl = targetURL
+	local testurl = "http://google.com"
+	if (substring(testurl, 1, 4) == "http") then
 		testurl = testurl:gsub("^https?://", "")
 	end
 	-- strip subfolders b/c of iOS bug
-	testurl = string.gsub(testurl, "/.*", "")
+	testurl = gsub(testurl, "/.*", "")
 
 	canConnectWithServer(testurl, false, doPop, testing)
 		
@@ -2434,7 +2532,7 @@ end
 -- get date parts for a given ISO 8601 date format (http://richard.warburton.it )
 local function get_date_parts(date_str)
 	if (date_str) then
-		local _,_,y,m,d=string.find(date_str, "(%d+)-(%d+)-(%d+)")
+		local _,_,y,m,d=find(date_str, "(%d+)-(%d+)-(%d+)")
 		return tonumber(y),tonumber(m),tonumber(d)
 	else
 		return nil,nil,nil
@@ -2841,7 +2939,7 @@ end
 
 -- returns true/false depending whether value is a percent
 local function isPercent (x)
-	local v,s = string.match(x, "(%d+)(%%)$")
+	local v,s = match(x, "(%d+)(%%)$")
 	if (s == "%") then
 		return true
 	else
@@ -2852,7 +2950,7 @@ end
 
 -- Return x%, e.g. 10% returns .10
 local function percent (x)
-	local v = string.match(x, "(%d+)%%$")
+	local v = match(x, "(%d+)%%$")
 	if v then
 		v = v / 100
 	end
@@ -2870,21 +2968,35 @@ end
 ----------
 -- Find new width/height to margins within an x,y
 -- x,y default to the screen
+-- fit: true/false, where true = fill
 -- Return ration r, the amount to use for rescaling, e.g. obj:scale(r,r)
-local function ratioToFitMargins (w,h, t,b,l,r, x,y)
+-- To fit into the screen, just call ratioToFitMargins (obj.w, obj.h)
+local function ratioToFitMargins (w,h, fill, t,b,l,r, x,y)
 	local x = x or screenW
 	local y = y or screenH
-
-	local ww = w - l - r
-	local hh = h - t - b
-
+	
+	t = t or 0
+	b = b or 0
+	l = l or 0
+	r = r or 0
+	
+	-- Space to fit into
+	local ww = x - l - r
+	local hh = y - t - b
+	
+	-- Ratios to fit
 	local wr = ww/w
-	local wh = hh/h
+	local hr = hh/h
 
-	if (wr < wh) then
+	-- default is fit, i.e. not fill
+	local cond = (wr >= hr)
+	if (not fill) then
+		cond = (wr < hr)
+	end
+	if (cond) then
 		r = wr
 	else
-		r = wh
+		r = hr
 	end
 	return r
 end
@@ -3040,12 +3152,12 @@ end
 local function AddCommas( number, maxPos )
 
 	local s = tostring( number )
-	local len = string.len( s )
+	local len = strlen( s )
 
 	if len > maxPos then
 		-- Add comma to the string
-		local s2 = string.sub( s, -maxPos )
-		local s1 = string.sub( s, 1, len - maxPos )
+		local s2 = substring( s, -maxPos )
+		local s1 = substring( s, 1, len - maxPos )
 		s = (s1 .. "," .. s2)
 	end
 
@@ -3124,9 +3236,9 @@ end
 --
 
 local function stripCommandLinesFromText(text)
-	local substring = string.sub
+	local substring = substring
 	local cleanText = ""
-	for line in string.gmatch(text, "[^\n]+") do
+	for line in gmatch(text, "[^\n]+") do
 		line = trim(line)
 		if (substring(line,1,3) ~= "###") then
 			cleanText = cleanText .. "\n" .. line
@@ -3229,7 +3341,7 @@ end
 
 -- Testing function to show a line and insert into group g
 local function showTestLine (g,x,y,t,leading)
-	y = math.floor(y)
+	y = floor(y)
 	leading = leading or 0
 	local len = 100
 	local b = display.newLine(g, x, y, x+len, y)
@@ -3292,7 +3404,7 @@ end
 --------------------------------------------------------
 
 local function adjustXYforShadow (x, y, rp, shadowOffset, scale)
-	local stringFind = string.find
+	local stringFind = find
 
 	if (shadowOffset) then
 		local shadowOffsetX = 0
@@ -3324,8 +3436,8 @@ local function adjustXYforShadow (x, y, rp, shadowOffset, scale)
 		end
 		x = x or 0
 		y = y or 0
-		x = math.floor((x + shadowOffsetX) * scale)
-		y = math.floor((y + shadowOffsetY) * scale)
+		x = floor((x + shadowOffsetX) * scale)
+		y = floor((y + shadowOffsetY) * scale)
 		--print ("b) adjustXYforShadow adjustedment:", x, y, scale)
 	end
 	return x,y
@@ -3343,7 +3455,7 @@ end
 --------------------------------------------------------
 
 local function referenceAdjustedXY (obj, x, y, newReferencePoint, scale, shadowOffset)
-	local stringFind = string.find
+	local stringFind = find
 	
 	local rx, ry, rp, offsetX, offsetY
 
@@ -3377,8 +3489,8 @@ local function referenceAdjustedXY (obj, x, y, newReferencePoint, scale, shadowO
 			offsetY = 0
 		end
 
-		--x = math.floor( (x + offsetX) * scale)
-		--y = math.floor( (y + offsetY) * scale)
+		--x = floor( (x + offsetX) * scale)
+		--y = floor( (y + offsetY) * scale)
 
 		if (x == "center") then
 			x = midscreenX
@@ -3397,8 +3509,8 @@ local function referenceAdjustedXY (obj, x, y, newReferencePoint, scale, shadowO
 		end
 
 
-		x = math.floor( x + (offsetX * scale))
-		y = math.floor( y + (offsetY * scale))
+		x = floor( x + (offsetX * scale))
+		y = floor( y + (offsetY * scale))
 
 --print ("b) referenceAdjustedXY adjustedment:", x, y, scale, shadowOffset)
 	end
@@ -3706,6 +3818,7 @@ end
 -- Given a width/height, build picture corners to fit.
 -- filenames are of each corner
 -- offsets specify positioning correction
+-- 0,0 of the corners is the CENTER!
 local function buildPictureCorners (w,h, filenames, offsets)
 	local g = display.newGroup()
 	local imageTL = display.newImage(g, filenames.TL)
@@ -3714,16 +3827,16 @@ local function buildPictureCorners (w,h, filenames, offsets)
 	local imageBR = display.newImage(g, filenames.BR)
 
 	anchor(imageTL, "TopLeft")
-	imageTL.x = 0 + offsets.TLx; imageTL.y = 0 + offsets.TLy;
+	imageTL.x = 0 + offsets.TLx - w/2; imageTL.y = 0 + offsets.TLy - h/2;
 
 	anchor(imageTR, "TopRight")
-	imageTR.x = w + offsets.TRx; imageTR.y = 0 + offsets.TRy;
+	imageTR.x = w/2 + offsets.TRx; imageTR.y = -h/2 + offsets.TRy;
 
 	anchor(imageBL, "BottomLeft")
-	imageBL.x = 0 + offsets.BLx; imageBL.y = h + offsets.BLy;
+	imageBL.x = -w/2 + offsets.BLx; imageBL.y = h/2 + offsets.BLy;
 
 	anchor(imageBR, "BottomRight")
-	imageBR.x = w + offsets.BRx; imageBR.y = h + offsets.BRy;
+	imageBR.x = w/2 + offsets.BRx; imageBR.y = h/2 + offsets.BRy;
 
 	return g
 end
@@ -3799,7 +3912,7 @@ end
 -- Return FALSE if the type is unknown
 -- NOTE: we're checking for 3 letter suffixes, so .html will mess up...use ".htm"
 local function mediaFileType(f)
-	local suffix = string.sub(f, string.len(f)-3, -1)
+	local suffix = substring(f, strlen(f)-3, -1)
 	local t = {
 		jpg="image",
 		png="image",
@@ -3931,16 +4044,30 @@ end
 -------------------------------------------------
 -------------------------------------------------
 -- Special Strokes around objects
+-- Designed to go behind an image, not in front.
 -- params may include:
 -- stroke width (stroke)
 -- params MUST tell us what kind of object, e.g. "rectangle", etc.
 -- Styles:
--- solid : a normal stroke
+-- solid : a stroke 100% outside the image (not like a Corona stroke that is on the edge)
 -- thin-thick : 25% inner stroke, 50% out, with 25% padding
-local function strokeRectObject(o,params)
-	local floor = math.floor
+-- thick-thin : 50% inner stroke, 25% out, with 25% padding
+-- The matte color is for a matte around the image. The tintColor is laid over the group, tinting it.
+--[[
+	@param	obj	A display group to frame
+	@param	params	A table, params = { 
+								stroke = integer, 
+								style = solid | thick-thin | thin-thick, 
+								color = RGBAColorString, 
+								matteColor = RGBAColorString, 
+								tintColor = RGBAColorString, 
+								matte = integer,
+							}
+--]]
+local function strokeGroupObject(obj,params)
+	local floor = floor
 
-			local function framingObject(o,padding,fillcolor,strokeWidth,strokeColor)
+			local function framingObject(o, padding, fillcolor, strokeWidth, strokeColor)
 				local dup = display.newRect(0,0,o.contentWidth+(2*padding), o.contentHeight+(2*padding))
 				dup:setFillColor(fillcolor[1], fillcolor[2], fillcolor[3], fillcolor[4])
 				dup.strokeWidth = strokeWidth
@@ -3949,56 +4076,90 @@ local function strokeRectObject(o,params)
 			end
 
 	-- Default is transparent fill for stroking boxes
-	local fillcolor = stringToColorTable(params.fillColor or "0,0,0,0")
 	local color = stringToColorTable(params.color or "0,0,0")
+	local tintColor = stringToColorTable(params.tintColor or "0,0,0,0")
+	local mattecolor = stringToColorTable(params.matteColor or "255,255,255,100%")
+	params.stroke = params.stroke or 0
+	params.matte = params.matte or 0
 
-	if (params.style == "Solid") then
-		o.strokeWidth = params.stroke or 0
-		o:setStrokeColor(color[1], color[2], color[3], color[4])
-		return o
-	elseif (params.style == "Thick - Thin") then
+	-- The frame
+	local f, temp
+
+	params.style = lower(params.style)
+	if ( params.style == "solid") then
+
+		temp = obj.anchorChildren
+		obj.anchorChildren = true
+		f = display.newRect(0,0, obj.contentWidth + params.stroke + params.matte, obj.contentHeight + params.stroke + params.matte)
+		obj:insert(f)
+		f:toBack()
+		obj.anchorChildren = temp
+
+		f.strokeWidth = params.stroke or 0
+		f:setStrokeColor(color[1], color[2], color[3], color[4])
+		if (mattecolor) then
+			f:setFillColor(mattecolor[1], mattecolor[2], mattecolor[3], mattecolor[4])
+		end
+		if (params.tintColor) then
+			local outerObj = framingObject(f, 0, tintColor, 0, "0,0,0,0")	
+			obj:insert(outerObj)
+		end
+
+	elseif (params.style == "thick-thin") then
+		
+		f = display.newGroup()
+		f.anchorChildren = true
+		
+		temp = obj.anchorChildren
+		obj.anchorChildren = true
+		local innerFrame = display.newRect(f, 0,0, obj.contentWidth + params.stroke + params.matte, obj.contentHeight + params.stroke + params.matte)
+		obj:insert(f)
+		f:toBack()
+		obj.anchorChildren = temp
+
 		local sw = params.stroke or 0
 		local innerW = floor(sw * 0.25) or 1
 		local outerW = floor(sw * 0.5) or 1
 		local padding = (sw-(innerW + outerW)) or 1
 
-		o.strokeWidth = innerW
-		o:setStrokeColor(color[1], color[2], color[3], color[4])
+		innerFrame.strokeWidth = innerW
+		innerFrame:setStrokeColor(color[1], color[2], color[3], color[4])
+		if (mattecolor) then
+			innerFrame:setFillColor(mattecolor[1], mattecolor[2], mattecolor[3], mattecolor[4])
+		end
 
-		local outerObj = framingObject(o,padding, fillcolor, outerW,color)
-
-		local g = display.newGroup()
-		g:insert(outerObj)
-		g:insert(o);
-		outerObj.x = 0
-		outerObj.y = 0
-		o.x = 0
-		o.y = 0
-		return g
-	elseif (params.style == "Thin - Thick") then
+		local outerObj = framingObject(f, padding, tintColor, outerW, color)	
+		f:insert(outerObj)
+		
+--		obj:insert(o);
+--		outerObj.x = 0
+--		outerObj.y = 0
+--		o.x = 0
+--		o.y = 0
+		
+	elseif (params.style == "thin-thick") then
 		local sw = params.stroke or 0
 		local innerW = floor(sw * 0.5) or 1
 		local outerW = floor(sw * 0.25) or 1
 		local padding = (sw-(innerW + outerW)) or 1
 --print (params.stroke, innerW,outerW,padding)
 
-		o.strokeWidth = innerW
-		o:setStrokeColor(color[1], color[2], color[3], color[4])
+		f.strokeWidth = innerW
+		f:setStrokeColor(color[1], color[2], color[3], color[4])
+		if (mattecolor) then
+			f:setFillColor(mattecolor[1], mattecolor[2], mattecolor[3], mattecolor[4])
+		end
 
-		local outerObj = framingObject(o,padding, fillcolor, outerW, color)
-
-		local g = display.newGroup()
-		g:insert(outerObj)
-		g:insert(o);
-		outerObj.x = 0
-		outerObj.y = 0
-		o.x = 0
-		o.y = 0
-		return g
-	else
-		-- return original item
-		return o
+		local outerObj = framingObject(f, padding, tintColor, outerW, color)
+		obj:insert(outerObj)
+		
+--		obj:insert(o);
+--		outerObj.x = 0
+--		outerObj.y = 0
+--		o.x = 0
+--		o.y = 0
 	end
+	return f
 
 end
 
@@ -4037,7 +4198,7 @@ end
 -- cleanPath: clean up a path
 local function cleanPath (p)
 	if (p) then
-		local substring = string.sub
+		local substring = substring
 		p = p:gsub("/\./","/")
 		p = p:gsub("//","/")
 		p = p:gsub("/\.$","")
@@ -4074,22 +4235,22 @@ end
 local function dirname(path)
 	while true do
 		if path == "" or
-		   string.sub(path, -1) == "/" or
---		   string.find(path, "^/\..") or
---		   string.sub(path, -2) == "/." or
-		   string.sub(path, -3) == "/.." or
-		   (string.sub(path, -1) == "." and
-			string.len(path) == 1) or
-		   (string.sub(path, -2) == ".." and
-			string.len(path) == 2) then
+		   substring(path, -1) == "/" or
+--		   find(path, "^/\..") or
+--		   substring(path, -2) == "/." or
+		   substring(path, -3) == "/.." or
+		   (substring(path, -1) == "." and
+			strlen(path) == 1) or
+		   (substring(path, -2) == ".." and
+			strlen(path) == 2) then
 			break
 		end
-		path = string.sub(path, 1, -2)
+		path = substring(path, 1, -2)
 	end
 	if path == "" then
 		path = "."
 	end
-	if string.sub(path, -1) ~= "/" then
+	if substring(path, -1) ~= "/" then
 		path = path .. "/"
 	end
 
@@ -4102,9 +4263,9 @@ end
 -- Returns trailing name component of path
 -- Extract my/dir/bottomdir => bottomdir
 local function basename (path)
-	path = string.gsub(path, "%/$", "")
+	path = gsub(path, "%/$", "")
 	path = "/"..path
-	local d = string.gsub(path, "^.*/","")
+	local d = gsub(path, "^.*/","")
 	return d
 end
 
@@ -4176,7 +4337,7 @@ local function copyDir (src, srcBaseDir, target, targetBaseDir, newname)
 		local filename
 		for filename in lfs.dir(srcPath) do
 			local res = lfs.chdir (srcPath)
-			if (res and allowDotFiles or string.sub(filename, 1, 1) ~= ".") then
+			if (res and allowDotFiles or substring(filename, 1, 1) ~= ".") then
 				if (filename ~= "." and filename ~= ".." ) then
 					local attr = lfs.attributes (filename)
 					if (attr.mode == "directory") then
@@ -4260,20 +4421,20 @@ end
 
 
 local function url_decode(str)
-  str = string.gsub (str, "+", " ")
-  str = string.gsub (str, "%%(%x%x)",
-	  function(h) return string.char(tonumber(h,16)) end)
-  str = string.gsub (str, "\r\n", "\n")
+  str = gsub (str, "+", " ")
+  str = gsub (str, "%%(%x%x)",
+	  function(h) return char(tonumber(h,16)) end)
+  str = gsub (str, "\r\n", "\n")
   return str
 end
 
 
 local function url_encode(str)
   if (str) then
-	str = string.gsub (str, "\n", "\r\n")
-	str = string.gsub (str, "([^%w ])",
-		function (c) return string.format ("%%%02X", string.byte(c)) end)
-	str = string.gsub (str, " ", "+")
+	str = gsub (str, "\n", "\r\n")
+	str = gsub (str, "([^%w ])",
+		function (c) return format ("%%%02X", string.byte(c)) end)
+	str = gsub (str, " ", "+")
   end
   return str
 end
@@ -4396,7 +4557,7 @@ end
 
 
 -- This makes a mask for a rectangle on the screen at a particular x,y
-local function makeMaskForRect(x,y,width, height, maskDirectory)
+local function makeMaskForRect(x,y,width, height, maskDirectory, maskfilename, baseDir)
 
 	-- Display.save uses the screen size, so a retina will save a double-size image than what we need
 
@@ -4405,28 +4566,40 @@ local function makeMaskForRect(x,y,width, height, maskDirectory)
 
 	maskDirectory = maskDirectory or "_masks"
 
-	local baseDir = system.CachesDirectory
-	local maskfilename = maskDirectory .. "/" .. "mask-" .. width .. "x" .. height .. "@" .. x .. "," .. y .. "-" ..screenW.."x"..screenH..".png"
+	maskfilename = maskfilename or "mask-" .. width .. "x" .. height .. "@" .. x .. "," .. y .. "-" ..screenW.."x"..screenH..".png"
+	local baseDir = baseDir or system.CachesDirectory
+	local maskfilename = maskDirectory .. "/" .. maskfilename
 	if (not fileExists(maskfilename, baseDir) ) then
 
 		mkdirTree (maskDirectory, baseDir)
 
 		local g = display.newGroup()
 
+		-- Mask sizing. Needs min. 3px on each side, must be divisible by 4
+		local bw = math.max(display.contentWidth, 4*math.ceil((width+6)/4) )
+		local bh = math.max(display.contentHeight, 4*math.ceil((height+6)/4) )		
+		
+		if (bw > display.contentWidth or bh > display.contentHeight) then
+			print ("ERROR: funx.makeMaskForRect: Cannot create a mask larger than the display. This mask won't work.")
+		end
+		
 		local scalingRatio = scaleFactorForRetina()
+		bw = bw * scalingRatio
+		bh = bh * scalingRatio
 		width = width * scalingRatio
 		height = height * scalingRatio
-
-		-- black background
-		local mask = display.newRect(g, 0,0,screenW, screenH )
+		
+		-- black background.
+		local mask = display.newRect(g, 0,0, bw, bh )
 		mask:setFillColor(0)
+		anchor(mask, "TopLeft")
 
 		-- opening
 		local opening = display.newRect(g, 0,0,width, height )
 		opening:setFillColor(255)
 		anchor(opening, "TopLeft")
-		opening.x = x
-		opening.y = y
+		opening.x = x + 3
+		opening.y = y + 3
 
 		display.save( g, maskfilename, baseDir )
 		g:removeSelf()
@@ -4488,13 +4661,13 @@ local function translateHTMLEntity(s)
                       ["&amp;"] = "&",
                       ["&quot;"] = '"',
                       ["&apos;"] = "'",
-                      ["&bull;"] = string.char(149),
-                      ["&dash;"] = string.char(150),
-                      ["&mdash;"] = string.char(151),
+                      ["&bull;"] = char(149),
+                      ["&dash;"] = char(150),
+                      ["&mdash;"] = char(151),
                       ["&#(%d+);"] = function (x)
                                         local d = tonumber(x)
                                         if d >= 0 and d < 256 then
-                                            return string.char(d)
+                                            return char(d)
                                         else
                                             return "&#"..d..";"
                                         end
@@ -4502,7 +4675,7 @@ local function translateHTMLEntity(s)
                       ["&#x(%x+);"] = function (x)
                                         local d = tonumber(x,16)
                                         if d >= 0 and d < 256 then
-                                            return string.char(d)
+                                            return char(d)
                                         else
                                             return "&#x"..x..";"
                                         end
@@ -4511,7 +4684,7 @@ local function translateHTMLEntity(s)
 	-- Replace the entities found in s
 	for k,v in pairs(_ENTITIES) do
 		--print (k, v)
-		s = string.gsub(s,k,v)
+		s = gsub(s,k,v)
 	end
 	return s
 end
@@ -4521,7 +4694,7 @@ end
 local function checksum(str)
    local temp = 0
    local weight = 10
-   for i = 1, string.len(str) do
+   for i = 1, strlen(str) do
       local c = str:byte(i,i)
       temp = temp + c * weight
       weight = weight - 1
@@ -4538,7 +4711,6 @@ local function checksum(str)
       end
    end
    --]]
-   print (temp,str)
 	return temp
 end
 
@@ -4656,7 +4828,7 @@ end
 -- Synonyms : title, normal
 -- ====================================================================
 local function setCase(case, str)
-	if case and case ~= "" then
+	if case and case ~= "" and case ~= "none" then
 		case = lower(trim(case))
 		if (case == "lowercase") then
 			str = lower(str)
@@ -4725,6 +4897,7 @@ FUNX.cleanPath  = cleanPath
 FUNX.copyDir  = copyDir 
 FUNX.copyFile  = copyFile 
 FUNX.coverUpScreenEdges = coverUpScreenEdges
+FUNX.crypt = crypt
 FUNX.datetime_to_unix_time = datetime_to_unix_time
 FUNX.deleteDirectoryContents = deleteDirectoryContents
 FUNX.dimScreen = dimScreen
@@ -4831,7 +5004,8 @@ FUNX.stringToColorTable = stringToColorTable
 FUNX.stringToColorTableHDR = stringToColorTableHDR
 FUNX.stringToMarginsTable = stringToMarginsTable
 FUNX.stripCommandLinesFromText = stripCommandLinesFromText
-FUNX.strokeRectObject = strokeRectObject
+FUNX.strokeGroupObject = strokeGroupObject
+FUNX.flattenTable  = flattenTable 
 FUNX.substitutions  = substitutions 
 FUNX.table_multi_sort = table_multi_sort
 FUNX.table_sort = table_sort
