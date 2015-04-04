@@ -1,0 +1,67 @@
+settings =
+{
+	orientation =
+	{
+		default = "portraitLeft",
+		supported =
+		{
+			"landscapeLeft", "landscapeRight", "portraitLeft", "portraitRight",
+		},
+	},
+
+	iphone = {
+		plist = {
+			UIAppFonts = 
+                        {
+                        },
+			UIInterfaceOrientation = "UIInterfaceOrientationLandscapeRight",
+			UISupportedInterfaceOrientations =
+			{
+				"UIInterfaceOrientationLandscapeLeft",
+				"UIInterfaceOrientationLandscapeRight"
+			},
+			
+			UIPrerenderedIcon="YES",
+			UIStatusBarHidden=true,
+			CFBundleDisplayName="Text Render",
+			UIApplicationExitsOnSuspend = false,
+
+			FacebookAppID = "",
+            CFBundleURLTypes =
+            {
+                {
+                    CFBundleURLSchemes =
+                    {
+                     }
+                }
+            },
+			CFBundleIconFile = "Icon.png",
+			CFBundleIconFiles = {
+					"Icon-72.png" , 
+					"Icon-Small-50.png" , 
+					"Icon-Small.png" , 
+					"Icon-Small@2x.png" , 
+					"Icon.png" , 
+					"Icon@2x.png" , 
+			},
+		},
+	},
+	
+	
+	android =
+	{
+		usesPermissions =
+		{
+			"android.permission.INTERNET",
+		},
+	},
+
+	
+}
+
+settings.iphone.plist["UIInterfaceOrientation~ipad"] = "UIInterfaceOrientationLandscapeLeft"
+settings.iphone.plist["UISupportedInterfaceOrientations~ipad"] = 
+{
+    "UIInterfaceOrientationLandscapeLeft",
+    "UIInterfaceOrientationLandscapeRight"
+}

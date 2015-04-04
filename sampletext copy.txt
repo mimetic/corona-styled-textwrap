@@ -1,0 +1,67 @@
+<p class="Normal"><b><i>B-Style:</i> the parameter 'isHTML' is OmyGodThisisaverylongwordOmyGodThisisaverylongword</b> This is normal text, of course!</p>
+
+
+<p><i><b>Note:</b> the parameter 'isHTML' is true!</i></p>
+<br>  
+<br> 
+<p>One of the most distinguishing features of this species is the bold dark-bars draped across the dorsal surface. Additional dark spots are found along the lateral surfaces of the species. In adult specimens, the pectoral fins are broadly triangular.</p>
+<p>The caudal fin is elongate, and lacks a lower lobe altogether. This species is an active, strong swimming shark, often observed moving with an undulating motion. They are known to form large schools, occasionally aggregating with gray or brown smooth-hound sharks (<em>Mustelus californicus</em> and <em>M. henlei</em>) and piked dogfish (<em>Squalus acanthias</em>).</p>
+<br>  
+<br>  
+<b>NOTES:</b><br>
+<p>- These lines should start with special characters.</p>
+• The bold-dark bars should split at the hyphen.<br>
+
+
+<p class="Heading 1">Updates:</p>
+
+<p>Lists should work pretty well:</p>
+<ul>
+	<li>Item 1</li>
+	<li>Item 2</li>
+	<li>Item 3</li>
+</ul>
+
+<ol>
+	<li>Item 1</li>
+	<li>Item 2</li>
+	<li>Item 3</li>
+</ol>
+
+<p>
+Bunny looked at him and said</p>
+<p>- Who are you, anyway?</p>
+<p>Bunny looked at him and said</p>
+<p>  - Who are you, anyway?</p>
+
+
+
+<p class="Normal" style="font-family:ASafePlacetoFall;font-size:24;line-height:32;color:rgb(0,0,0);text-align:left;text-transform:none;margin-top:0;margin-bottom:8;text-indent:0;margin-left:0;margin-right:0;"><span style="font-family:ASafePlacetoFall;font-size:24;text-transform: none;color:rgb(0,0,0);"> Here we are at the surface, where the blades spread out to absorb sunlight for</span><a href="toggleCaption" style="font-family:ASafePlacetoFall;font-size:24;text-transform: none;color:rgb(37,64,143);">photosynthesis</a><span style="font-family:ASafePlacetoFall;font-size:24;text-transform: none;color:rgb(0,0,0);">. Look, an egret! The kelp is very thick up here, so thick that seabirds can walk on top of it</span></p>
+
+
+
+
+<p class="Left">One of the most distinguishing features of this species is the bold dark-bars draped across the dorsal surface. Additional dark spots are found along the lateral surfaces of the species. In adult specimens, the pectoral fins are broadly triangular.</p>
+<br>
+<br>
+<p class="Left" >
+	<i><span>Center McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span></i> are great people who love to eat super-duper-wooper all day.
+</p>
+<br/><br/>
+<p class="Right" >
+	<i><span>Center McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span></i> are great people who love to eat super-duper-wooper all day.
+</p>
+<br/><br/>
+<p class="Left" >
+	<p style="text-align:center;">Omnivores <br/>eat animals & plants & algae, and <br> <i><span>Center<br/>McGross </span><span style="color:rgb(232,109,31);">&</span><span style="color:rgb(0,0,0);"> Mieke Strand</span></i> are great people<br>who love to eat super-duper-wooper all day.</p>
+</p>
+
+
+<p class="Left" style="text-align:center;">
+	cows are nice to me. Omnivores <br />eat animals & plants & algae, and <br /> 
+	<i>
+		<span>Center<br />
+		McGross</span><span style="color:rgb(170,70,70);">sss</span>
+	</i>
+	are great people<br /> who love to eat super-duper-wooper all day. Fish are also wonderful things taht we can all love. 
+</p>
