@@ -705,6 +705,15 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 		-- restore text
 		text = text.text
 	end
+	
+	-- If no text, do nothing.
+	if (not text) then
+		return result
+	end
+	
+	
+	-- Be sure text isn't nil
+	text = text or ""
 
 	-- Caching values
 	-- Name the cache with the width, too, so the same text isn't wrapped to the wrong
@@ -797,8 +806,11 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	text = text:gsub(funx.unescape(lineSeparatorCode),"")
 	text = text:gsub(funx.unescape(paragraphSeparatorCode),"")
 
+
 	-- Convert entities in the text, .e.g. "&#8211;"
-	text = entities.unescape(text)
+	if (not settings.isHTML) then
+		text = entities.unescape(text)
+	end
 
 
 	--- THEN, TOO, THERE'S MY OWN FLAVOR OF LINE BREAK!
@@ -808,7 +820,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	------------------------
 
 	maxHeight = tonumber(maxHeight) or 0
-
 
 	-- Minimum number of characters per line. Start low.
 	--local minLineCharCount = minCharCount or 5
@@ -1214,10 +1225,10 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 	local paragraphbreak = funx.unescape(paragraphSeparatorCode)
 	local oneLinePattern = "[^\n^\r]+"
 	local oneLinePattern = ".-[\n\r]"
-
 	if (settings.isHTML) then
 		--print ("Autowrap: line 500 : text is HTML!")
-		text = trim(text:gsub("[\n\r]+"," "))
+		text = text:gsub("[\n\r]+"," ")
+		text = trim(text, false)
 	end
 
 	-- ----------------------
@@ -1590,12 +1601,9 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 								end
 							end
 
-
 							
 							-- =======================================================
 							-- =======================================================
-
-
 
 							-- flag to indicate the text line to be rendered is the last line of the previously
 							-- rendered text (true) or is the continuation of that text (false)
@@ -2230,6 +2238,7 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 								---------------------------------------------
 
 								currentLine = currentLine .. shortword
+								shortword = ""
 
 								-- Allow for lines with beginning spaces, for positioning
 								if (usePeriodsForLineBeginnings and substring(currentLine,1,1) == ".") then
@@ -2405,6 +2414,9 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 					local styleSettings = getAllStyleSettings()
 
 					tag, attr = convertHeaders(tag, attr)
+					
+					-- Be sure the tag isn't null
+					tag = tag or ""
 					tag = lower(tag)
 
 					local listIdentDistance = 20
@@ -2655,7 +2667,6 @@ local function autoWrappedText(text, font, size, lineHeight, color, width, align
 			result:insert(oneXMLBlock)
 			oneXMLBlock.anchorX, oneXMLBlock.anchorY = 0, 0
 		end -- html elements for one paragraph
-
 
 	end
 

@@ -308,6 +308,7 @@ end
 --[[function M.char_entity(s)
 	local i = s:match('&(%a+);')
 	local n = character_entities[i]
+	local s
 	if (n) then
 		s = char(n)
 	end
@@ -316,12 +317,16 @@ end
 --]]
 
 function M.convert(s)
-	s = M.dec_entity(s)
-	--s = M.char_entity(s)
-	return s
+	if (s) then
+		return M.dec_entity(s)
+	else
+		return s
+	end
 end
 
+-- UNUSED
 -- Find the entity, get the character, OR return NIL
+--[[
 local function get_character_entity(s)
 	local c = character_entities[s]
 	print ("C",c)
@@ -330,6 +335,7 @@ local function get_character_entity(s)
 	end
 	return nil
 end
+--]]
 
 local gsub, char = string.gsub, string.char
 local entitySwap = function(orig,n,s)
