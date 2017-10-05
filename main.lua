@@ -12,7 +12,7 @@
 	lineHeight = line height in pixels
 	color = text color in an RGBa color table, e.g. {250, 0, 0, 255}
 	width = Width of the text column,
-	alignment = text alignment: "Left", "Right", "Center"
+	textAlignment = text alignment: "Left", "Right", "Center"
 	opacity = text opacity (between 0 and 1, or as a percent, e.g. "50%" or 0.5
 	minCharCount = Minimum number of characters per line. Estimate low, e.g. 5
 	targetDeviceScreenSize = String of target screen size, in the form, "width,height", e.g. e.g. "1024,768".  May be different from current screen size.
