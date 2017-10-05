@@ -1,3 +1,6 @@
+*THIS HAS BEEN REPLACED BY 'CORONA-TEXTRENDER'!*
+======================
+
 corona-styled-textwrap
 ======================
 
